@@ -62,6 +62,21 @@ def getFileTypesFromProject(project):
     return returnTypes
 
 
+def getIntegrationsFromProject(project):
+    if not "INTEGRATIONS" in project:
+        return []
+    returnIntegrations = []
+    integrations = project["INTEGRATIONS"]
+    for integration in integrations:
+        iconPath = "icons/{}.png".format(integration)
+        if not os.path.exists("./" + iconPath):
+            iconPath = "icons/user.png"
+        integPix = QtGui.QPixmap(iconPath)
+        integPix = integPix.scaledToHeight(20)
+        returnIntegrations.append(integPix)
+    return returnIntegrations
+
+
 def getNotesPreviewFromProject(project):
     if not "NOTES" in project:
         return ["-"]
@@ -128,7 +143,3 @@ def getUserModifiedFromProject(project):
     userModified = QtGui.QPixmap(iconPath)
     userModified = userModified.scaledToHeight(25)
     return userModified
-
-
-def isProjectGitEnabled(project):
-    return bool(project.get("GIT_ENABLED", False))

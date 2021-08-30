@@ -10,7 +10,7 @@ def getAllProjectsForPath(diskPath):
     tempProject['DESCRIPTION'] = "Amazon Alexa skill for augmented play with foam-based weaponry."
     tempProject['DIRECTORY_NAS'] = "/mnt/y/home/2018_01_18_alexaDartBattle"
     tempProject['FILE_TYPES'] = ["py", "png", "md", "txt", "mp3", "mp4", "prproj", "cfa", "pek", "log", "csv"]
-    tempProject['GIT_ENABLED'] = True
+    tempProject['INTEGRATIONS'] = ["git", "alexa"]
     tempProject['GIT_ROOT'] = "/mnt/y/home/2018_01_18_alexaDartBattle"
     tempProject['NOTES'] = {
             "2021.08.20_23:23:16": "Now worthy of my public github",

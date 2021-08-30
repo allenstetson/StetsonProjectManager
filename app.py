@@ -221,7 +221,7 @@ class SHPMProjectBrowserDelegate(QtWidgets.QItemDelegate):
             statusStr
         )
         ### Only print integrations if there are any
-        if controller.isProjectGitEnabled(value):
+        if controller.getIntegrationsFromProject(value):
             kerning = 10
             widthOffset = QtGui.QFontMetrics(font10).width(statusStr)
             widthOffset += kerning
@@ -237,10 +237,10 @@ class SHPMProjectBrowserDelegate(QtWidgets.QItemDelegate):
             widthOffset = QtGui.QFontMetrics(fontBold10).width(intr)
             coords[0] += widthOffset
             coords[2] += widthOffset
-            gitIcon = QtGui.QPixmap("icons/git.png")
-            gitIcon = gitIcon.scaledToHeight(20)
-            position = QtCore.QPoint(coords[0], coords[1])
-            painter.drawPixmap(position, gitIcon)
+            for integ in controller.getIntegrationsFromProject(value):
+                position = QtCore.QPoint(coords[0], coords[1])
+                painter.drawPixmap(position, integ)
+                coords[0] += 22
 
         ## tags
         coords = list(option.rect.getCoords())
