@@ -25,20 +25,25 @@ def getContributorsFromProject(project):
         if not os.path.exists("./" + imagePath):
             pass
         pixmap = QtGui.QPixmap(imagePath)
-        pixmap = pixmap.scaledToHeight(20)
+        pixmap = pixmap.scaledToHeight(25)
         contributors.append(pixmap)
     return contributors
 
 
+def getDateCreatedFromProject(project):
+    if not "DATE_CREATED" in project:
+        return "-"
+    return project["DATE_CREATED"].split("_")[0]
+
 def getDateModifiedFromProject(project):
     if not "DATE_MODIFIED" in project:
         return "-"
-    modStr = project["DATE_MODIFIED"]
-    mod = datetime.datetime.strptime(modStr, "%Y.%m.%d_%H:%M:%S")
-    today = datetime.datetime.now()
-    if (today - mod).days == 0:
-        return(mod.strftime("today, %H:%M:%S"))
-    return(mod.strftime("%a, %b %d, %Y %H:%M"))
+    return project["DATE_MODIFIED"].split("_")[0]
+
+def getDescriptionFromProject(project):
+    if not "DESCRIPTION" in project:
+        return "-"
+    return project["DESCRIPTION"]
 
 
 def getFileTypesFromProject(project):
@@ -67,7 +72,7 @@ def getNotesPreviewFromProject(project):
         if i > 1:
             break
         noteDate = datetime.datetime.strptime(noteDateStr, "%Y.%m.%d_%H:%M:%S")
-        prettyDate = noteDate.strftime("(%Y.%m.%d): ")
+        prettyDate = noteDate.strftime("(%Y.%m.%d) ")
         # limit the entry to the first 90 characters
         noteEntry = project["NOTES"][noteDateStr]
         if len(noteEntry) > 90:
@@ -92,6 +97,28 @@ def getTagsFromProject(project):
     return tags
 
 
+def getThumbnailFromProject(project):
+    if not "THUMBNAIL" in project:
+        return None
+    thumbPath = project["THUMBNAIL"]
+    if not os.path.exists(thumbPath):
+        thumbPath = "icons/project_unknown.png"
+    pixmap = QtGui.QPixmap(thumbPath)
+    pixmap = pixmap.scaledToHeight(80)
+    return pixmap
+
+
+def getUserCreatedFromProject(project):
+    if not "USER_CREATED" in project:
+        return None
+    iconPath = "icons/{}.png".format(project["USER_CREATED"])
+    if not os.path.exists("./" + iconPath):
+        iconPath = "icons/user.png"
+    userCreated = QtGui.QPixmap(iconPath)
+    userCreated = userCreated.scaledToHeight(25)
+    return userCreated
+
+
 def getUserModifiedFromProject(project):
     if not "USER_MODIFIED" in project:
         return None
@@ -99,8 +126,9 @@ def getUserModifiedFromProject(project):
     if not os.path.exists("./" + iconPath):
         iconPath = "icons/user.png"
     userModified = QtGui.QPixmap(iconPath)
-    userModified = userModified.scaledToHeight(20)
+    userModified = userModified.scaledToHeight(25)
     return userModified
+
 
 def isProjectGitEnabled(project):
     return bool(project.get("GIT_ENABLED", False))

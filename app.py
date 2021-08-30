@@ -9,6 +9,13 @@ from PyQt5 import QtCore, QtGui, QtWidgets
 import controller
 
 
+TAG_COLORS = {
+    "blue":   ((70, 207, 255), (0, 0, 0)),
+    "yellow": ((255, 208, 4), (0, 0, 0)),
+    "green":  ((0, 227, 101), (0, 0, 0)),
+    "grey":   ((238, 238, 238), (0, 0, 0)),
+}
+
 class StetsonHPMMainWindow(QtWidgets.QMainWindow):
     """Main window for Stetson HPM"""
     def __init__(self, parent=None):
@@ -98,13 +105,14 @@ class SHPMProjectBrowserDelegate(QtWidgets.QItemDelegate):
         #FIXME: This gets continually called/calculated on mouse move.
         #  Somehow ensure that this happens once, caches, and serves the cache
         painter.save()
+        painter.setRenderHint(QtGui.QPainter.HighQualityAntialiasing)
 
         # item background
         painter.setPen(QtGui.QPen(QtCore.Qt.NoPen))
         if option.state & QtWidgets.QStyle.State_Selected:
-            painter.setBrush(QtGui.QBrush(QtCore.Qt.gray))
-        else:
             painter.setBrush(QtGui.QBrush(QtCore.Qt.lightGray))
+        else:
+            painter.setBrush(QtGui.QBrush(QtCore.Qt.white))
         painter.drawRect(option.rect)
 
         # item
@@ -112,211 +120,326 @@ class SHPMProjectBrowserDelegate(QtWidgets.QItemDelegate):
         if not value:
             return
 
+        framePadding = 25
+        thumbnailDimensions = 80
+
         # Common Fonts
-        fontMed10 = QtGui.QFont("Arial", 10, QtGui.QFont.Medium)
+        font10 = QtGui.QFont("Roboto", 10, QtGui.QFont.Normal)
+        fontMed10 = QtGui.QFont("Roboto", 10, QtGui.QFont.Medium)
         fontMed9 = QtGui.QFont("Arial", 9, QtGui.QFont.Medium)
-        fontBold10 = QtGui.QFont("Arial", 10, QtGui.QFont.Bold)
+        fontMed20 = QtGui.QFont("Roboto", 20, QtGui.QFont.Medium)
+        fontBold10 = QtGui.QFont("Roboto", 10, QtGui.QFont.Bold)
+        fontBold14 = QtGui.QFont("Arial", 14, QtGui.QFont.Bold)
         fontBold20 = QtGui.QFont("Arial", 20, QtGui.QFont.Bold)
+        fontBold25 = QtGui.QFont("Roboto", 25, QtGui.QFont.Bold)
         fontBold30 = QtGui.QFont("Arial", 30, QtGui.QFont.Bold)
-
-
-        # --------- left --------------
-        ## item TN
-        if value["THUMBNAIL"]:
-            thumb = QtGui.QPixmap(value["THUMBNAIL"])
-            topLeft = option.rect.topLeft()
-            position = QtCore.QPoint(topLeft.x() + 5, topLeft.y() + 5)
-            painter.drawPixmap(position, thumb)
-
-        ## Contributors
-        contributors = controller.getContributorsFromProject(value)
-        for i, contributor in enumerate(contributors):
-            if i > 3:  # we only have room for 4 pix
-                break
-            topLeft = option.rect.topLeft()
-            thisX = topLeft.x() + 5 + (25 * i)
-            thisY = topLeft.y() + 125
-            position = QtCore.QPoint(thisX, thisY)
-            painter.drawPixmap(position, contributor)
-
-        # --------- center ------------
-        ## item title
-        painter.setPen(QtGui.QPen(QtCore.Qt.black))
-        painter.setFont(fontBold30)
-        title = value["PROJECT_NAME"]
-        coords = list(option.rect.getCoords())
-        # offset coords by thumbnail size; use fixed for now
-        coords[0] += 125
-        coords[1] += 5
-        coords[2] += 125
-        coords[3] += 5
-        painter.drawText(QtCore.QRect(*coords), QtCore.Qt.AlignLeft, title)
-        ## description
-        thisFont = fontMed9
-        thisFont.setItalic(True)
-        painter.setFont(thisFont)
-        descr = value["DESCRIPTION"]
-        coords[1] += 40
-        coords[3] += 40
-        painter.drawText(QtCore.QRect(*coords), QtCore.Qt.AlignLeft, descr)
-
-        ## item created date
-        coords[1] += 15
-        coords[3] += 15
-        upperLeft = QtCore.QPointF(coords[0], coords[1])
-        userCreated = QtGui.QPixmap("icons/allen.png")
-        userCreated = userCreated.scaledToHeight(20)
-        painter.drawPixmap(upperLeft, userCreated)
-
-        coords[0] += 25
-        coords[1] += 5
-        coords[2] += 25
-        coords[3] += 5
-        painter.setFont(fontBold10)
-        created = "created: "
-        widthOffset = QtGui.QFontMetrics(fontBold10).width(created)
-        painter.drawText(QtCore.QRect(*coords), QtCore.Qt.AlignLeft, created)
-        #
-        coords[0] += widthOffset
-        coords[2] += widthOffset
-        painter.setFont(fontMed10)
-        created = value["DATE_CREATED"].split("_")[0]
-        painter.drawText(QtCore.QRect(*coords), QtCore.Qt.AlignLeft, created)
-        # return painter cursor to left margin
-        coords[0] -= (25 + widthOffset)
-        coords[2] -= (25 + widthOffset)
-
-        ## item modified date
-        coords[1] += 15
-        coords[3] += 15
-        upperLeft = QtCore.QPointF(coords[0], coords[1])
-        userModified = controller.getUserModifiedFromProject(value)
-        painter.drawPixmap(upperLeft, userModified)
-
-        coords[0] += 25
-        coords[1] += 5
-        coords[2] += 25
-        coords[3] += 5
-        painter.setFont(fontBold10)
-        mod = "last modified: "
-        widthOffset = QtGui.QFontMetrics(fontBold10).width(mod)
-        painter.drawText(QtCore.QRect(*coords), QtCore.Qt.AlignLeft, mod)
-        #
-        coords[0] += widthOffset
-        coords[2] += widthOffset
-        painter.setFont(fontMed10)
-        mod = controller.getDateModifiedFromProject(value)
-        painter.drawText(QtCore.QRect(*coords), QtCore.Qt.AlignLeft, mod)
-        # return painter cursor to left margin
-        coords[0] -= (25 + widthOffset)
-        coords[2] -= (25 + widthOffset)
-
-        ## Notes
-        coords[1] += 20
-        coords[3] += 20
-        painter.setFont(fontMed10)
-        painter.drawText(QtCore.QRect(*coords), QtCore.Qt.AlignLeft, "NOTES:")
-        coords[0] += 10
-        coords[2] += 10
-        painter.setFont(fontMed9)
-
-        for noteStr in controller.getNotesPreviewFromProject(value):
-            coords[1] += 15
-            coords[3] += 15
-            painter.drawText(
-                QtCore.QRect(*coords),
-                QtCore.Qt.AlignLeft,
-                noteStr)
-        coords[0] -= 10
-        if len(controller.getNotesPreviewFromProject(value)) < 2:
-            # We always want to pad like there are two lines of notes:
-            coords[1] += 15
-
-        ## file types
-        coords[1] += 20
-        fileTypeStr = controller.getFileTypesFromProject(value)
-
-        painter.setPen(QtGui.QPen(QtCore.Qt.black))
-        painter.setFont(fontMed10)
-        painter.drawText(QtCore.QRect(*coords), QtCore.Qt.AlignLeft, fileTypeStr)
 
         # ---------- utility for tagging --------
         def paintTag(tag, color, coords):
+            colorValues = TAG_COLORS[color]
             # box
-            widthOffset = QtGui.QFontMetrics(fontBold10).width(tag) + 10
+            tagPadding = 30
+            widthOffset = QtGui.QFontMetrics(fontMed10).width(tag) + tagPadding
             coords[2] = widthOffset
-            tagColor = QtGui.QColor(*color)
-            painter.setBrush(QtGui.QBrush(tagColor))
-            painter.drawRect(QtCore.QRect(*coords))
+            tagColor = QtGui.QColor(*colorValues[0])
+            smoothBox = QtGui.QPainterPath()
+            smoothBox.addRoundedRect(QtCore.QRectF(*coords), 10, 10)
+            painter.setRenderHint(QtGui.QPainter.Antialiasing)
+            painter.setPen(QtGui.QPen(QtGui.QColor(*colorValues[1])))
+            painter.fillPath(smoothBox, tagColor)
 
             # text
-            coords[0] += 8  # pad the text in the box
+            coords[0] += tagPadding / 2  # pad the text in the box
             painter.setPen(QtGui.QPen(QtCore.Qt.black))
-            painter.setFont(fontMed9)
+            painter.setFont(fontMed10)
             painter.drawText(QtCore.QRect(*coords), QtCore.Qt.AlignLeft, tag)
             # prepare for the next tag:
             coords[0] += widthOffset
+            coords[0] -= tagPadding / 2  # remove text padding
+            coords[0] += 5  # nice space between tags
             return coords
 
-        # --------- right -------------
-        ## category
+        # --------- top drop shadow -------
         coords = list(option.rect.getCoords())
-        coords[0] = coords[2] - 100 # The right column is 100 from the edge
-        coords[1] += 60  # The first entry is after the descr, 60 down
-        coords[3] = 15
-        pstatus = controller.getProjectStatusFromProject(value)
-        statusColors = {
-            "released": (75, 190, 90),
-            "in progress": (217, 211, 48),
-            "on hold": (200, 152, 60),
-            "unknown": (200, 200, 200)
-        }
-        if pstatus in statusColors:
-            pcolor = statusColors[pstatus]
-        else:
-            pcolor = statusColors["unknown"]
-        paintTag(pstatus, pcolor, coords)
+        coords[3] = 5
+        shadowRect = QtCore.QRect(*coords)
+        grad = QtGui.QLinearGradient(
+            shadowRect.topRight(),
+            shadowRect.bottomRight()
+        )
+        grad.setColorAt(0, QtGui.QColor(255, 255, 255))
+        grad.setColorAt(1, QtGui.QColor(235, 235, 235))
+        painter.fillRect(shadowRect, grad)
 
-        ## git icon
+        # --------- top row ----------
+        ## item TN
+        thumbnail = controller.getThumbnailFromProject(value)
+        if thumbnail:
+            topLeft = option.rect.topLeft()
+            position = QtCore.QPoint(
+                topLeft.x() + framePadding,
+                topLeft.y() + framePadding + 12
+            )
+            painter.drawPixmap(position, thumbnail)
+
+        ## item title
+        painter.setPen(QtGui.QPen(QtCore.Qt.black))
+        painter.setFont(fontMed20)
+        title = value["PROJECT_NAME"]
         coords = list(option.rect.getCoords())
-        coords[0] = coords[2] - 100
-        coords[1] += 80
+        coords[0] += framePadding + thumbnailDimensions + framePadding
+        coords[1] += framePadding
+        coords[2] += framePadding + thumbnailDimensions + framePadding
+        coords[3] += framePadding
+        painter.drawText(QtCore.QRect(*coords), QtCore.Qt.AlignLeft, title)
+        ## description
+        painter.setFont(font10)
+        descr = controller.getDescriptionFromProject(value)
+        coords[1] += 34  # under title
+        coords[3] += 34
+        painter.drawText(QtCore.QRect(*coords), QtCore.Qt.AlignLeft, descr)
+
+        ## Status & Integrations
+        coords[1] += 20  # under descr
+        coords[3] += 20
+        painter.setFont(fontBold10)
+        painter.drawText(
+            QtCore.QRect(*coords),
+            QtCore.Qt.AlignLeft,
+            "Status: "
+        )
+        widthOffset = QtGui.QFontMetrics(fontBold10).width("Status: ")
+        coords[0] += widthOffset
+        coords[2] += widthOffset
+        painter.setFont(font10)
+        statusStr = controller.getProjectStatusFromProject(value)
+        painter.drawText(
+            QtCore.QRect(*coords),
+            QtCore.Qt.AlignLeft,
+            statusStr
+        )
+        ### Only print integrations if there are any
         if controller.isProjectGitEnabled(value):
+            kerning = 10
+            widthOffset = QtGui.QFontMetrics(font10).width(statusStr)
+            widthOffset += kerning
+            coords[0] += widthOffset
+            coords[2] += widthOffset
+            painter.setFont(fontBold10)
+            intr = "Integrations: "
+            painter.drawText(
+                QtCore.QRect(*coords),
+                QtCore.Qt.AlignLeft,
+                intr
+            )
+            widthOffset = QtGui.QFontMetrics(fontBold10).width(intr)
+            coords[0] += widthOffset
+            coords[2] += widthOffset
             gitIcon = QtGui.QPixmap("icons/git.png")
             gitIcon = gitIcon.scaledToHeight(20)
             position = QtCore.QPoint(coords[0], coords[1])
             painter.drawPixmap(position, gitIcon)
 
-        # --------- bottom ------------
-        ## Tags
+        ## tags
         coords = list(option.rect.getCoords())
-
-        coords[0] += 5 # pad the width a tag
-        coords[1] = coords[3] - 20  # height just off the bottom of the rect
-        coords[3] = 15  # height of 15
+        coords[0] += framePadding + thumbnailDimensions + framePadding
+        coords[1] += framePadding + 34 + 20 + 27  # under status&int
+        coords[2] += framePadding + thumbnailDimensions + framePadding
+        coords[3] = 20 # tag height
 
         category = controller.getCategoryFromProject(value)
         if category:
-            coords = paintTag(category, (200, 152, 60), coords)
+            coords = paintTag(category, "blue", coords)
 
         ptype = controller.getProjectTypeFromProject(value)
         if ptype:
-            coords = paintTag(ptype, (217, 211, 48), coords)
+            coords = paintTag(ptype, "yellow", coords)
 
         for tag in controller.getTagsFromProject(value):
             if tag in [category, ptype]:
                 # No sense in repeating info, just skip this
                 continue
-            coords = paintTag(tag, (124, 191, 190), coords)
+            coords = paintTag(tag, "grey", coords)
 
-        
+        # ----------------------------
+        heightOffset = framePadding + 12 + thumbnailDimensions + 12 + 12
+        coords = list(option.rect.getCoords())
+        coords[1] += heightOffset
+        coords[3] += heightOffset
+        lineSeparator = QtGui.QPainterPath()
+        lineSeparator.moveTo(coords[0] + 25, coords[1])
+        lineSeparator.lineTo(coords[2] - 25, coords[1])
+        painter.setPen(QtGui.QPen(QtGui.QColor(200, 200, 200)))
+        painter.drawPath(lineSeparator)
+        # --------- middle row -------
+
+        ## Created icon
+        heightOffset = framePadding + 12 + thumbnailDimensions + 10 + 20
+        coords = list(option.rect.getCoords())
+        coords[0] += framePadding
+        coords[1] += heightOffset
+        coords[2] += framePadding
+        coords[3] += heightOffset
+        upperLeft = QtCore.QPointF(coords[0], coords[1])
+        userCreated = controller.getUserCreatedFromProject(value)
+        painter.drawPixmap(upperLeft, userCreated)
+        ## Created Label
+        coords[0] += 30  # after icon
+        coords[1] += 3   # centering at image
+        coords[2] += 30
+        coords[3] += 3
+        painter.setFont(fontBold10)
+        painter.setPen(QtGui.QPen(QtCore.Qt.black))
+        words = "Created: "
+        widthOffset = QtGui.QFontMetrics(fontBold10).width(words)
+        painter.drawText(QtCore.QRect(*coords), QtCore.Qt.AlignLeft, words)
+        ## Created date
+        coords[0] += widthOffset
+        coords[2] += widthOffset
+        painter.setFont(font10)
+        created = controller.getDateCreatedFromProject(value)
+        painter.drawText(QtCore.QRect(*coords), QtCore.Qt.AlignLeft, created)
+        widthOffset = QtGui.QFontMetrics(font10).width(created)
+
+        ## Modified icon
+        coords[0] += widthOffset + 45  # lots of space between entries
+        coords[1] -= 3  # remove text centering
+        coords[2] += widthOffset + 45
+        coords[3] -= 3
+        upperLeft = QtCore.QPointF(coords[0], coords[1])
+        userModified = controller.getUserModifiedFromProject(value)
+        painter.drawPixmap(upperLeft, userModified)
+        ## Modified Label
+        coords[0] += 30  # after icon
+        coords[1] += 3   # centering at image
+        coords[2] += 30
+        coords[3] += 3
+        painter.setFont(fontBold10)
+        painter.setPen(QtGui.QPen(QtCore.Qt.black))
+        words = "Last Modified: "
+        widthOffset = QtGui.QFontMetrics(fontBold10).width(words)
+        painter.drawText(QtCore.QRect(*coords), QtCore.Qt.AlignLeft, words)
+        ## Modified date
+        coords[0] += widthOffset
+        coords[2] += widthOffset
+        painter.setFont(font10)
+        modified = controller.getDateModifiedFromProject(value)
+        widthOffset = QtGui.QFontMetrics(font10).width(modified)
+        painter.drawText(QtCore.QRect(*coords), QtCore.Qt.AlignLeft, modified)
+
+        ## Contributors Label
+        coords[0] += widthOffset + 45  # lots of space between entries
+        coords[2] += widthOffset + 45
+        painter.setFont(fontBold10)
+        painter.setPen(QtGui.QPen(QtCore.Qt.black))
+        words = "Contributors: "
+        widthOffset = QtGui.QFontMetrics(fontBold10).width(words)
+        painter.drawText(QtCore.QRect(*coords), QtCore.Qt.AlignLeft, words)
+        ## Contributors Icons
+        contributors = controller.getContributorsFromProject(value)
+        coords[0] += widthOffset
+        coords[1] -= 3  # remove text centering
+        coords[2] += widthOffset
+        coords[3] -= 3
+        upperLeft = QtCore.QPointF(coords[0], coords[1])
+        for i, contributor in enumerate(contributors):
+            if i > 0:
+                coords[0] += 20  # move over from last icon
+                # This isn't our first icon. We need to draw a white circle
+                #  to separate the overlapping user icons before drawing
+                #  the user icon.
+                whiteCircle = QtGui.QPainterPath()
+                coords[0] -= 3  # back up a touch
+                coords[1] -= 2  # larger circle means nudge down
+                whiteCircle.moveTo(coords[0], coords[1])
+                whiteCircle.arcTo(coords[0], coords[1], 30, 30, 0, 360)
+                whiteCircle.closeSubpath()
+                whiteColor = QtGui.QColor(255, 255, 255)
+                painter.fillPath(whiteCircle, whiteColor)
+                coords[0] += 3  # undo offsets
+                coords[1] += 2
+            # TODO: If the number of contributors exceeds 5, draw instead of
+            #  the fifth icon a grey circle with the +# indicating the number
+            #  of contributors. Else draw the icon.
+            iconSpot = QtCore.QPointF(coords[0], coords[1])
+            painter.drawPixmap(iconSpot, contributor)
+
+        # ----------------------------
+        heightOffset = framePadding + 12 + thumbnailDimensions + 10 + 50
+        coords = list(option.rect.getCoords())
+        coords[1] += heightOffset
+        coords[3] += heightOffset
+        lineSeparator = QtGui.QPainterPath()
+        lineSeparator.moveTo(coords[0] + 25, coords[1])
+        lineSeparator.lineTo(coords[2] - 25, coords[1])
+        painter.setPen(QtGui.QPen(QtGui.QColor(200, 200, 200)))
+        painter.drawPath(lineSeparator)
+        # --------- bottom row -------
+
+        ## Formats
+        heightOffset = framePadding + 12 + thumbnailDimensions + 10 + 60
+        coords = list(option.rect.getCoords())
+        coords[0] += framePadding
+        coords[1] += heightOffset
+        coords[2] += framePadding
+        coords[3] += heightOffset
+        painter.setFont(fontBold10)
+        painter.setPen(QtGui.QPen(QtCore.Qt.black))
+        words = "Formats: "
+        painter.drawText(QtCore.QRect(*coords), QtCore.Qt.AlignLeft, words)
+        widthOffset = 90  # instead of metrics, the bottom row specifies
+        coords[0] += widthOffset
+        coords[2] += widthOffset
+        painter.setFont(font10)
+        ftypes = controller.getFileTypesFromProject(value)
+        painter.drawText(QtCore.QRect(*coords), QtCore.Qt.AlignLeft, ftypes)
+
+        ## Notes
+        heightOffset = framePadding + 12 + thumbnailDimensions + 10 + 85
+        coords = list(option.rect.getCoords())
+        coords[0] += framePadding
+        coords[1] += heightOffset
+        coords[2] += framePadding
+        coords[3] += heightOffset
+        painter.setFont(fontBold10)
+        painter.setPen(QtGui.QPen(QtCore.Qt.black))
+        words = "Notes: "
+        painter.drawText(QtCore.QRect(*coords), QtCore.Qt.AlignLeft, words)
+        widthOffset = 90  # instead of metrics, the bottom row specifies
+        coords[0] += widthOffset
+        coords[2] += widthOffset
+        painter.setFont(font10)
+        notes = controller.getNotesPreviewFromProject(value)
+        for note in notes:
+            painter.drawText(
+                QtCore.QRect(*coords),
+                QtCore.Qt.AlignLeft,
+                note
+            )
+            coords[1] += 18
+            coords[3] += 18
+
+        # --------- bottom drop shadow -------
+        heightOffset = framePadding + 12 + thumbnailDimensions + 10 + 130
+        coords = list(option.rect.getCoords())
+        coords[1] += heightOffset
+        coords[3] = 10
+        shadowRect = QtCore.QRect(*coords)
+        grad = QtGui.QLinearGradient(
+            shadowRect.topRight(),
+            shadowRect.bottomRight()
+        )
+        grad.setColorAt(0, QtGui.QColor(235, 235, 235))
+        grad.setColorAt(1, QtGui.QColor(255, 255, 255))
+        painter.fillRect(shadowRect, grad)
+
 
 
 
         painter.restore()
 
     def sizeHint(self, option, index):
-        size = QtCore.QSize(200, 200)
+        size = QtCore.QSize(200, 263)
         return size
 
 

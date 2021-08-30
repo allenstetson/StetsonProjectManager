@@ -23,7 +23,7 @@ def getAllProjectsForPath(diskPath):
     tempProject['PROJECT_TYPE'] = "alexa"
     tempProject['TAGS'] = ["alexa", "nerf", "demoreel"]
     tempProject['THUMBNAIL_WSL'] = "/mnt/y/home/2018_01_18_alexaDartBattle/media/dartBattleLogo_108x108.png"
-    tempProject['THUMBNAIL'] = "dartBattleLogo_108x108.png"
+    tempProject['THUMBNAIL'] = "icons/project_dartbattle.png"
     tempProject['USER_CONTRIBUTORS'] = ["allen", "jisun", "owen"]
     tempProject['USER_CREATED'] = "allen"
     tempProject['USER_MODIFIED'] = "jisun"
