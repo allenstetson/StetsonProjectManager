@@ -420,7 +420,7 @@ class SHPMProjectBrowserDelegate(QtWidgets.QItemDelegate):
             coords[3] += 18
 
         # --------- bottom drop shadow -------
-        heightOffset = framePadding + 12 + thumbnailDimensions + 10 + 130
+        heightOffset = framePadding + 12 + thumbnailDimensions + 10 + 145
         coords = list(option.rect.getCoords())
         coords[1] += heightOffset
         coords[3] = 10
@@ -439,7 +439,7 @@ class SHPMProjectBrowserDelegate(QtWidgets.QItemDelegate):
         painter.restore()
 
     def sizeHint(self, option, index):
-        size = QtCore.QSize(200, 263)
+        size = QtCore.QSize(200, 278)
         return size
 
 
