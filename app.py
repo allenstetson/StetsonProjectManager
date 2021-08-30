@@ -107,10 +107,12 @@ class SHPMProjectBrowserDelegate(QtWidgets.QItemDelegate):
         painter.save()
         painter.setRenderHint(QtGui.QPainter.HighQualityAntialiasing)
 
+        backgroundColorSelected = QtCore.Qt.lightGray
+
         # item background
         painter.setPen(QtGui.QPen(QtCore.Qt.NoPen))
         if option.state & QtWidgets.QStyle.State_Selected:
-            painter.setBrush(QtGui.QBrush(QtCore.Qt.lightGray))
+            painter.setBrush(QtGui.QBrush(backgroundColorSelected))
         else:
             painter.setBrush(QtGui.QBrush(QtCore.Qt.white))
         painter.drawRect(option.rect)
@@ -269,7 +271,10 @@ class SHPMProjectBrowserDelegate(QtWidgets.QItemDelegate):
         lineSeparator = QtGui.QPainterPath()
         lineSeparator.moveTo(coords[0] + 25, coords[1])
         lineSeparator.lineTo(coords[2] - 25, coords[1])
-        painter.setPen(QtGui.QPen(QtGui.QColor(200, 200, 200)))
+        if option.state & QtWidgets.QStyle.State_Selected:
+            painter.setPen(QtGui.QPen(QtGui.QColor(100, 100, 100)))
+        else:
+            painter.setPen(QtGui.QPen(QtGui.QColor(200, 200, 200)))
         painter.drawPath(lineSeparator)
         # --------- middle row -------
 
@@ -355,7 +360,10 @@ class SHPMProjectBrowserDelegate(QtWidgets.QItemDelegate):
                 whiteCircle.arcTo(coords[0], coords[1], 30, 30, 0, 360)
                 whiteCircle.closeSubpath()
                 whiteColor = QtGui.QColor(255, 255, 255)
-                painter.fillPath(whiteCircle, whiteColor)
+                if option.state & QtWidgets.QStyle.State_Selected:
+                    painter.fillPath(whiteCircle, backgroundColorSelected)
+                else:
+                    painter.fillPath(whiteCircle, whiteColor)
                 coords[0] += 3  # undo offsets
                 coords[1] += 2
             # TODO: If the number of contributors exceeds 5, draw instead of
@@ -372,7 +380,10 @@ class SHPMProjectBrowserDelegate(QtWidgets.QItemDelegate):
         lineSeparator = QtGui.QPainterPath()
         lineSeparator.moveTo(coords[0] + 25, coords[1])
         lineSeparator.lineTo(coords[2] - 25, coords[1])
-        painter.setPen(QtGui.QPen(QtGui.QColor(200, 200, 200)))
+        if option.state & QtWidgets.QStyle.State_Selected:
+            painter.setPen(QtGui.QPen(QtGui.QColor(100, 100, 100)))
+        else:
+            painter.setPen(QtGui.QPen(QtGui.QColor(200, 200, 200)))
         painter.drawPath(lineSeparator)
         # --------- bottom row -------
 
@@ -451,6 +462,8 @@ class SHPMProjectBrowserList(QtWidgets.QFrame):
         self.listModel = SHPMProjectBrowserListModel(allProjects, self)
         self.listDelegate = SHPMProjectBrowserDelegate(self)
         self.listView = QtWidgets.QListView()
+        self.listView.setVerticalScrollMode(
+            QtWidgets.QAbstractItemView.ScrollPerPixel)
         self.listView.setModel(self.listModel)
         self.listView.setItemDelegate(self.listDelegate)
         self.layout.addWidget(self.listView)
