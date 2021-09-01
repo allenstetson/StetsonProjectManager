@@ -1,5 +1,6 @@
 
 # std imports
+import os
 import sys
 
 # qt imports
@@ -16,8 +17,207 @@ TAG_COLORS = {
     "grey":   ((238, 238, 238), (0, 0, 0)),
 }
 
+
+class ImagePushButton(QtWidgets.QPushButton):
+    def __init__(self, imagePath, dimensions=None, disabledPath=None,
+                 fixedSize=True, parent=None, pressedPath=None,
+                 rolloverPath=None, rotated=False):
+        super(ImagePushButton, self).__init__(parent=parent)
+        self._isRotated=rotated
+        self.dimensions = dimensions or (None, None)
+        self.pixmap = None
+        self.pixmapDisabled = None
+        self.pixmapNormal = None
+        self.pixmapOver = None
+        self.pixmapPressed = None
+        self.stickyOn = False
+
+        self._setPixmaps(imagePath, pressedPath, rolloverPath, disabledPath)
+        self.pressed.connect(self.update)
+        self.released.connect(self.update)
+        if self._isRotated:
+            self.rotateClockwise()
+        if fixedSize:
+            self.setFixedSize(self.sizeHint())
+
+    def _setPixmaps(self, imagePath, pressedPath, rolloverPath, disabledPath):
+        brokenImagePath = "./icons/photo_broken.png"
+        if not os.path.exists(imagePath):
+            imagePath = brokenImagePath
+        self.pixmapNormal = QtGui.QPixmap(imagePath)
+        if pressedPath:
+            if not os.path.exists(pressedPath):
+                pressedPath = brokenImagePath
+            self.pixmapPressed = QtGui.QPixmap(pressedPath)
+        else:
+            self.pixmapPressed = self.pixmapNormal
+        if rolloverPath:
+            if not os.path.exists(rolloverPath):
+                rolloverPath = brokenImagePath
+            self.pixmapOver = QtGui.QPixmap(rolloverPath)
+        else:
+            #self.pixmapOver = self.pixmapNormal
+            self.pixmapOver = QtGui.QPixmap(imagePath)
+            painter = QtGui.QPainter(self.pixmapOver)
+            painter.setCompositionMode(painter.CompositionMode_Overlay)
+            painter.fillRect(self.pixmapOver.rect(), QtGui.QColor(155, 155, 155))
+            painter.end()
+        if disabledPath:
+            if not os.path.exists(disabledPath):
+                disabledPath = brokenImagePath
+            self.pixmapDisabled = QtGui.QPixmap(disabledPath)
+        else:
+            self.pixmapDisabled = self.pixmapPressed
+        self.pixmap = self.pixmapNormal
+
+    def disable(self):
+        self.pixmap = self.pixmapDisabled
+        self.setEnabled(False)
+        
+    def enable(self):
+        self.pixmap = self.pixmapNormal
+        self.setEnabled(True)
+
+    def enterEvent(self, event):
+        self.update()
+
+    def leaveEvent(self, event):
+        self.update()
+
+    def paintEvent(self, event):
+        self.pixmap = self.pixmapNormal
+        if self.underMouse():
+            self.pixmap = self.pixmapOver
+        if self.isDown():
+            self.pixmap = self.pixmapPressed
+
+        painter = QtGui.QPainter(self)
+        painter.setRenderHint(QtGui.QPainter.Antialiasing)
+        painter.drawPixmap(event.rect(), self.pixmap)
+
+    def rotateClockwise(self):
+        transformation = QtGui.QTransform().rotate(90)
+        self.pixmap = self.pixmap.transformed(
+            transformation,
+            QtCore.Qt.SmoothTransformation
+        )
+        self.pixmapDisabled = self.pixmapDisabled.transformed(
+            transformation,
+            QtCore.Qt.SmoothTransformation
+        )
+        self.pixmapNormal = self.pixmapNormal.transformed(
+            transformation,
+            QtCore.Qt.SmoothTransformation
+        )
+        self.pixmapOver = self.pixmapOver.transformed(
+            transformation,
+            QtCore.Qt.SmoothTransformation
+        )
+        self.pixmapPressed = self.pixmapPressed.transformed(
+            transformation,
+            QtCore.Qt.SmoothTransformation
+        )
+        self._isRotated = True
+
+    def rotateCounterClockwise(self):
+        transformation = QtGui.QTransform().rotate(-90)
+        self.pixmap = self.pixmap.transformed(
+            transformation,
+            QtCore.Qt.SmoothTransformation
+        )
+        self.pixmapDisabled = self.pixmapDisabled.transformed(
+            transformation,
+            QtCore.Qt.SmoothTransformation
+        )
+        self.pixmapNormal = self.pixmapNormal.transformed(
+            transformation,
+            QtCore.Qt.SmoothTransformation
+        )
+        self.pixmapOver = self.pixmapOver.transformed(
+            transformation,
+            QtCore.Qt.SmoothTransformation
+        )
+        self.pixmapPressed = self.pixmapPressed.transformed(
+            transformation,
+            QtCore.Qt.SmoothTransformation
+        )
+        self._isRotated = False
+
+    def sizeHint(self):
+        if self.dimensions[0]:
+            height = self.dimensions[0]
+            width = self.dimensions[1] or \
+                    self.pixmap.scaledToHeight(height).width()
+        else:
+            height = self.pixmap.height()
+            width = self.pixmap.width()
+        return QtCore.QSize(width, height)
+
+    def toggleImageRotation(self):
+        if self._isRotated:
+            self.rotateCounterClockwise()
+        else:
+            self.rotateClockwise()
+
+    def toggleSticky(self):
+        if self.stickyOn:
+            self.pixmap = self.pixmapNormal
+            self.stickyOn = False
+        else:
+            self.pixmap = self.pixmapOver
+            self.stickyOn = True
+        self.update()
+
+
+
+class FilterTag(QtWidgets.QFrame):
+    def __init__(self, parent=None):
+        super(FilterTag, self).__init__(parent=parent)
+        self.layout = QtWidgets.QVBoxLayout()
+        self._buildLayout()
+        self.setLayout(self.layout)
+        self.setMaximumHeight(120)
+        self.setStyleSheet("background-color: #DDDDDD")
+
+    def _buildLayout(self):
+        titleLabel = QtWidgets.QLabel("Tag")
+        titleLabel.setFont(QtGui.QFont("Roboto", 14, QtGui.QFont.Bold))
+        self.layout.addWidget(titleLabel)
+
+        self.optionsLayout = QtWidgets.QHBoxLayout()
+        self.cbAction = QtWidgets.QComboBox()
+        self.cbAction.addItems(["with tag", "without tag"])
+        self.optionsLayout.addWidget(self.cbAction)
+
+        self.cbTags = QtWidgets.QComboBox()
+        self.cbTags.addItems(controller.getAllTags())
+        self.optionsLayout.addWidget(self.cbTags)
+        self.layout.addLayout(self.optionsLayout)
+
+        #bottom row
+        actionButtonsLayout = QtWidgets.QHBoxLayout()
+        self.btnDuplicate = ImagePushButton("./icons/copy.png", dimensions=(20, None))
+        actionButtonsLayout.addWidget(self.btnDuplicate)
+        spacer = QtWidgets.QSpacerItem(
+            20,
+            1,
+            QtWidgets.QSizePolicy.Expanding
+            )
+        actionButtonsLayout.addItem(spacer)
+        self.btnMute = ImagePushButton("./icons/invisible.png", dimensions=(20, None))
+        actionButtonsLayout.addWidget(self.btnMute)
+        self.btnDelete = ImagePushButton("./icons/delete.png", dimensions=(20, None))
+        actionButtonsLayout.addWidget(self.btnDelete)
+        self.layout.addLayout(actionButtonsLayout)
+
+
 class StetsonHPMMainWindow(QtWidgets.QMainWindow):
-    """Main window for Stetson HPM"""
+    """Main window for Stetson HPM, containing the main widget.
+
+    Args:
+        parent (QtWidgets.QWidget): The parent of this widget (optional).
+    
+    """
     def __init__(self, parent=None):
         super(StetsonHPMMainWindow, self).__init__(parent=parent)
         self.setWindowTitle("Stetson HPM")
@@ -28,6 +228,15 @@ class StetsonHPMMainWindow(QtWidgets.QMainWindow):
 
 
 class StetsonHPMMainWidget(QtWidgets.QFrame):
+    """Main widget for Stetson HPM.
+
+    This widget has a top bar and a body. Depending on the tool state, the body
+    could hold the project browser with filter or the project inspector, etc.
+
+    Args:
+        parent (QtWidgets.QWidget): The parent of this widget (optional).
+    
+    """
     def __init__(self, parent=None):
         super(StetsonHPMMainWidget, self).__init__(parent=parent)
         self.mainLayout = QtWidgets.QVBoxLayout()
@@ -86,28 +295,31 @@ class SHPMProjectBrowser(QtWidgets.QFrame):
 class SHPMProjectBrowserFilter(QtWidgets.QFrame):
     def  __init__(self, parent=None, *args, **kwargs):
         super(SHPMProjectBrowserFilter, self).__init__(parent=parent, *args, **kwargs)
-        self.layout = QtWidgets.QHBoxLayout()
-        mylabel = QtWidgets.QLabel("Browser Filter")
-        self.layout.addWidget(mylabel)
+        self.layout = QtWidgets.QVBoxLayout()
+        self._buildLayout()
         self.setLayout(self.layout)
         self.setMaximumWidth(200)
         self.setFrameShape(QtWidgets.QFrame.StyledPanel)
 
+    def _buildLayout(self):
+        self.layout.addWidget(FilterTag())
+        spacer = QtWidgets.QSpacerItem(
+            10,
+            700,
+            QtWidgets.QSizePolicy.Expanding
+            )
+        self.layout.addItem(spacer)
+
 
 class SHPMProjectBrowserDelegate(QtWidgets.QItemDelegate):
-    """
-    def  __init__(self, parent=None, *args):
-        super(SHPMProjectBrowserDelegate, self).__init__(parent=parent, *args)
-        print("In the delegate")
-    """
-
     def paint(self, painter, option, index):
         #FIXME: This gets continually called/calculated on mouse move.
         #  Somehow ensure that this happens once, caches, and serves the cache
         painter.save()
         painter.setRenderHint(QtGui.QPainter.HighQualityAntialiasing)
 
-        backgroundColorSelected = QtCore.Qt.lightGray
+        #backgroundColorSelected = QtCore.Qt.lightGray
+        backgroundColorSelected = QtGui.QColor(232, 235, 250)
 
         # item background
         painter.setPen(QtGui.QPen(QtCore.Qt.NoPen))
@@ -118,8 +330,8 @@ class SHPMProjectBrowserDelegate(QtWidgets.QItemDelegate):
         painter.drawRect(option.rect)
 
         # item
-        value = index.data(QtCore.Qt.DisplayRole)
-        if not value:
+        project = index.data(QtCore.Qt.DisplayRole)
+        if not project:
             return
 
         framePadding = 25
@@ -175,7 +387,7 @@ class SHPMProjectBrowserDelegate(QtWidgets.QItemDelegate):
 
         # --------- top row ----------
         ## item TN
-        thumbnail = controller.getThumbnailFromProject(value)
+        thumbnail = controller.getThumbnailFromProject(project)
         if thumbnail:
             topLeft = option.rect.topLeft()
             position = QtCore.QPoint(
@@ -187,7 +399,7 @@ class SHPMProjectBrowserDelegate(QtWidgets.QItemDelegate):
         ## item title
         painter.setPen(QtGui.QPen(QtCore.Qt.black))
         painter.setFont(fontMed20)
-        title = value["PROJECT_NAME"]
+        title = controller.getTitleFromProject(project)
         coords = list(option.rect.getCoords())
         coords[0] += framePadding + thumbnailDimensions + framePadding
         coords[1] += framePadding
@@ -196,7 +408,7 @@ class SHPMProjectBrowserDelegate(QtWidgets.QItemDelegate):
         painter.drawText(QtCore.QRect(*coords), QtCore.Qt.AlignLeft, title)
         ## description
         painter.setFont(font10)
-        descr = controller.getDescriptionFromProject(value)
+        descr = controller.getDescriptionFromProject(project)
         coords[1] += 34  # under title
         coords[3] += 34
         painter.drawText(QtCore.QRect(*coords), QtCore.Qt.AlignLeft, descr)
@@ -214,14 +426,14 @@ class SHPMProjectBrowserDelegate(QtWidgets.QItemDelegate):
         coords[0] += widthOffset
         coords[2] += widthOffset
         painter.setFont(font10)
-        statusStr = controller.getProjectStatusFromProject(value)
+        statusStr = controller.getProjectStatusFromProject(project)
         painter.drawText(
             QtCore.QRect(*coords),
             QtCore.Qt.AlignLeft,
             statusStr
         )
         ### Only print integrations if there are any
-        if controller.getIntegrationsFromProject(value):
+        if controller.getIntegrationsFromProject(project):
             kerning = 10
             widthOffset = QtGui.QFontMetrics(font10).width(statusStr)
             widthOffset += kerning
@@ -237,7 +449,7 @@ class SHPMProjectBrowserDelegate(QtWidgets.QItemDelegate):
             widthOffset = QtGui.QFontMetrics(fontBold10).width(intr)
             coords[0] += widthOffset
             coords[2] += widthOffset
-            for integ in controller.getIntegrationsFromProject(value):
+            for integ in controller.getIntegrationsFromProject(project):
                 position = QtCore.QPoint(coords[0], coords[1])
                 painter.drawPixmap(position, integ)
                 coords[0] += 22
@@ -249,15 +461,15 @@ class SHPMProjectBrowserDelegate(QtWidgets.QItemDelegate):
         coords[2] += framePadding + thumbnailDimensions + framePadding
         coords[3] = 20 # tag height
 
-        category = controller.getCategoryFromProject(value)
+        category = controller.getCategoryFromProject(project)
         if category:
             coords = paintTag(category, "blue", coords)
 
-        ptype = controller.getProjectTypeFromProject(value)
+        ptype = controller.getProjectTypeFromProject(project)
         if ptype:
             coords = paintTag(ptype, "yellow", coords)
 
-        for tag in controller.getTagsFromProject(value):
+        for tag in controller.getTagsFromProject(project):
             if tag in [category, ptype]:
                 # No sense in repeating info, just skip this
                 continue
@@ -286,7 +498,7 @@ class SHPMProjectBrowserDelegate(QtWidgets.QItemDelegate):
         coords[2] += framePadding
         coords[3] += heightOffset
         upperLeft = QtCore.QPointF(coords[0], coords[1])
-        userCreated = controller.getUserCreatedFromProject(value)
+        userCreated = controller.getUserCreatedFromProject(project)
         painter.drawPixmap(upperLeft, userCreated)
         ## Created Label
         coords[0] += 30  # after icon
@@ -302,7 +514,7 @@ class SHPMProjectBrowserDelegate(QtWidgets.QItemDelegate):
         coords[0] += widthOffset
         coords[2] += widthOffset
         painter.setFont(font10)
-        created = controller.getDateCreatedFromProject(value)
+        created = controller.getDateCreatedFromProject(project)
         painter.drawText(QtCore.QRect(*coords), QtCore.Qt.AlignLeft, created)
         widthOffset = QtGui.QFontMetrics(font10).width(created)
 
@@ -312,7 +524,7 @@ class SHPMProjectBrowserDelegate(QtWidgets.QItemDelegate):
         coords[2] += widthOffset + 45
         coords[3] -= 3
         upperLeft = QtCore.QPointF(coords[0], coords[1])
-        userModified = controller.getUserModifiedFromProject(value)
+        userModified = controller.getUserModifiedFromProject(project)
         painter.drawPixmap(upperLeft, userModified)
         ## Modified Label
         coords[0] += 30  # after icon
@@ -328,7 +540,7 @@ class SHPMProjectBrowserDelegate(QtWidgets.QItemDelegate):
         coords[0] += widthOffset
         coords[2] += widthOffset
         painter.setFont(font10)
-        modified = controller.getDateModifiedFromProject(value)
+        modified = controller.getDateModifiedFromProject(project)
         widthOffset = QtGui.QFontMetrics(font10).width(modified)
         painter.drawText(QtCore.QRect(*coords), QtCore.Qt.AlignLeft, modified)
 
@@ -341,7 +553,7 @@ class SHPMProjectBrowserDelegate(QtWidgets.QItemDelegate):
         widthOffset = QtGui.QFontMetrics(fontBold10).width(words)
         painter.drawText(QtCore.QRect(*coords), QtCore.Qt.AlignLeft, words)
         ## Contributors Icons
-        contributors = controller.getContributorsFromProject(value)
+        contributors = controller.getContributorsFromProject(project)
         coords[0] += widthOffset
         coords[1] -= 3  # remove text centering
         coords[2] += widthOffset
@@ -402,7 +614,7 @@ class SHPMProjectBrowserDelegate(QtWidgets.QItemDelegate):
         coords[0] += widthOffset
         coords[2] += widthOffset
         painter.setFont(font10)
-        ftypes = controller.getFileTypesFromProject(value)
+        ftypes = controller.getFileTypesFromProject(project)
         painter.drawText(QtCore.QRect(*coords), QtCore.Qt.AlignLeft, ftypes)
 
         ## Notes
@@ -420,7 +632,7 @@ class SHPMProjectBrowserDelegate(QtWidgets.QItemDelegate):
         coords[0] += widthOffset
         coords[2] += widthOffset
         painter.setFont(font10)
-        notes = controller.getNotesPreviewFromProject(value)
+        notes = controller.getNotesPreviewFromProject(project)
         for note in notes:
             painter.drawText(
                 QtCore.QRect(*coords),

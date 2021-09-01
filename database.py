@@ -44,6 +44,7 @@ class StetsonProj(collections.OrderedDict):
         super(StetsonProj, self).__init__()
         self['ID'] = str(uuid.uuid4())
         self['CLIENTS'] = []
+        self['CONTACTS'] = []
         self['COLOR'] = ""
         self['DATE_CREATED'] = datetime.datetime.now().strftime("%Y.%m.%d_%H:%M:%S")
         self['DATE_MODIFIED'] = datetime.datetime.now().strftime("%Y.%m.%d_%H:%M:%S")
@@ -54,6 +55,7 @@ class StetsonProj(collections.OrderedDict):
         self['GIT_ENABLED'] = False
         self['GIT_ROOT'] = ""
         self['IMG_PREVIEW'] = ""
+        self['INTEGRATIONS'] = []
         self['IS_ARCHIVED'] = False
         self['LAST_SYNC_DATE'] = datetime.datetime.now() - datetime.timedelta(365) # Init with dummy value
         self['LAST_SYNC_HOST'] = ""

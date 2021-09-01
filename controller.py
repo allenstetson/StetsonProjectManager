@@ -6,9 +6,14 @@ from PyQt5 import QtGui
 
 import projects
 
+
 def getAllProjects():
     return projects.getAllProjectsForPath("/mnt/y")
 
+
+def getAllTags():
+    # implement me
+    return (["home", "alexa", "nerf", "demoreel"])
 
 def getCategoryFromProject(project):
     if not "PROJECT_CATEGORY" in project:
@@ -110,6 +115,10 @@ def getProjectTypeFromProject(project):
 def getTagsFromProject(project):
     tags = project["TAGS"]
     return tags
+
+
+def getTitleFromProject(project):
+    return project["PROJECT_NAME"]
 
 
 def getThumbnailFromProject(project):
