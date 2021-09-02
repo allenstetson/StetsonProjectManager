@@ -62,6 +62,55 @@ class ClickableLabel(QtWidgets.QLabel):
         self.clicked.emit()
 
 
+class ComboBoxCompleter(QtWidgets.QComboBox):
+    def __init__(self, parent=None):
+        super(ComboBoxCompleter, self).__init__(parent=parent)
+        self.completer = QtWidgets.QCompleter(self)
+        self.completer.setCompletionMode(
+            QtWidgets.QCompleter.UnfilteredPopupCompletion)
+        self.completer.setPopup(self.view())
+        self.filterProxyModel = QtCore.QSortFilterProxyModel(self)
+        self.filterProxyModel.setFilterCaseSensitivity(QtCore.Qt.CaseInsensitive)
+        self.model = QtGui.QStandardItemModel()
+
+        self.setCompleter(self.completer)
+        self.setModel(self.model)
+        self.setEditable(True)
+        self.setFocusPolicy = QtCore.Qt.StrongFocus
+
+        self.lineEdit().textEdited.connect(
+            self.filterProxyModel.setFilterFixedString)
+        self.completer.activated.connect(self.setTextIfCompleterIsClicked)
+
+    def addItems(self, items):
+        for i, word in enumerate(items):
+            item = QtGui.QStandardItem(word)
+            self.model.setItem(i, 0, item)
+        self.setModelColumn(0)
+
+
+    def setModel(self, model):
+        super(ComboBoxCompleter, self).setModel(model)
+        self.filterProxyModel.setSourceModel(model)
+        self.completer.setModel(self.filterProxyModel)
+
+    def setModelColumn(self, column):
+        self.completer.setCompletionColumn(column)
+        self.filterProxyModel.setFilterKeyColumn(column)
+        super(ComboBoxCompleter, self).setModelColumn(column)
+
+    def view(self):
+        return self.completer.popup()
+
+    def index(self):
+        return self.currentIndex()
+
+    def setTextIfCompleterIsClicked(self, text):
+        if text:
+            index = self.findText(text)
+            self.setCurrentIndex(index)
+
+
 class ImagePushButton(QtWidgets.QPushButton):
     def __init__(self, imagePath, dimensions=None, disabledPath=None,
                  fixedSize=True, parent=None, pressedPath=None,
@@ -236,6 +285,10 @@ class FilterTagNewStyle(QtWidgets.QFrame):
         inclTagsLineLayout.addWidget(self.btnClearFilter)
         inclTagsLineLayout.addWidget(QtWidgets.QLabel(")"))
         self.layout.addLayout(inclTagsLineLayout)
+
+        self.cbCompleterTag = ComboBoxCompleter(self)
+        self.layout.addWidget(self.cbCompleterTag)
+        self.cbCompleterTag.addItems(["home", "alexa", "demoreel", "nerf"])
 
     def clearTags(self):
         print("Now clearing tags")
