@@ -18,6 +18,50 @@ TAG_COLORS = {
 }
 
 
+class ClickableLabel(QtWidgets.QLabel):
+    clicked = QtCore.pyqtSignal()
+    def __init__(self, labelText, color=None, parent=None):
+        super(ClickableLabel, self).__init__(parent=parent)
+        self.__stop = False
+        self._styleSheetAdditions = ""
+        self.labelText = labelText
+        self._build()
+        self.color = color or "blue"
+        self.setStyleSheet("color: {};".format(self.color))
+
+    def _build(self):
+        self.setText(self.labelText)
+        self.installEventFilter(self)
+
+    def addToStyleSheet(self, stuffToAdd, replace=False):
+        self._styleSheetAdditions += stuffToAdd
+        if replace:
+            self._styleSheetAdditions = stuffToAdd
+        self.setStyleSheet("color: {}; {}".format(
+            self.color, self._styleSheetAdditions))
+
+    def eventFilter(self, obj, event):
+        if event.type() == QtCore.QEvent.Enter:
+            styleSheetText = (
+                "color: {}; text-decoration: underline; {}")
+            styleSheetText = \
+                styleSheetText.format(self.color, self._styleSheetAdditions)
+            self.setStyleSheet(styleSheetText)
+            self.__stop = True
+        elif event.type() == QtCore.QEvent.Leave:
+            styleSheetText = (
+                "color: {}; text-decoration: none; {}")
+            styleSheetText = \
+                styleSheetText.format(self.color, self._styleSheetAdditions)
+            self.setStyleSheet(styleSheetText)
+            self.__stop = False
+        return False
+
+    def mousePressEvent(self, event):
+        super(ClickableLabel, self).mousePressEvent(event)
+        self.clicked.emit()
+
+
 class ImagePushButton(QtWidgets.QPushButton):
     def __init__(self, imagePath, dimensions=None, disabledPath=None,
                  fixedSize=True, parent=None, pressedPath=None,
@@ -169,10 +213,88 @@ class ImagePushButton(QtWidgets.QPushButton):
         self.update()
 
 
+class FilterTagNewStyle(QtWidgets.QFrame):
+    def __init__(self, parent=None):
+        super(FilterTagNewStyle, self).__init__(parent=parent)
+        self.layout = QtWidgets.QVBoxLayout()
+
+        self._buildLayout()
+        self.setLayout(self.layout)
+
+    def _buildLayout(self):
+        title = QtWidgets.QLabel("Filter by Tag")
+        title.setStyleSheet("font: 12px Roboto, sans-serif; "
+            "font-weight: bold;")
+        self.layout.addWidget(title)
+
+        # Include Tags line
+        inclTagsLineLayout = QtWidgets.QHBoxLayout()
+        inclTagsLineLayout.addWidget(QtWidgets.QLabel("Include Tags ("))
+        self.btnClearFilter = ClickableLabel("Clear tags")
+        self.btnClearFilter.addToStyleSheet("font: 12px Roboto, sans-serif;")
+        self.btnClearFilter.clicked.connect(self.clearTags)
+        inclTagsLineLayout.addWidget(self.btnClearFilter)
+        inclTagsLineLayout.addWidget(QtWidgets.QLabel(")"))
+        self.layout.addLayout(inclTagsLineLayout)
+
+    def clearTags(self):
+        print("Now clearing tags")
+
 
 class FilterTag(QtWidgets.QFrame):
     def __init__(self, parent=None):
         super(FilterTag, self).__init__(parent=parent)
+        self.layout = QtWidgets.QVBoxLayout()
+        self._searchType = "with tag"
+        self._tagName = "home"
+        self._title = "Tag"
+        self.phrase = "default label message"
+
+        self._buildLayout()
+        self.setLayout(self.layout)
+
+    def _buildLayout(self):
+        self.titleLabel = QtWidgets.QLabel(self._title)
+        self.layout.addWidget(self.titleLabel)
+        self.phraseLabel = QtWidgets.QLabel()
+        self.setPhrase()
+        self.layout.addWidget(self.phraseLabel)
+
+    def setPhrase(self):
+        self.phrase = "{}: \"{}\"".format(self._searchType, self._tagName)
+        self.phraseLabel.setText(self.phrase)
+
+    @property
+    def searchType(self):
+        return self._searchType
+
+    @searchType.setter
+    def searchType(self, searchType):
+        self._searchType = searchType
+        self.setPhrase()
+
+    @property
+    def tagName(self):
+        return self._tagName
+
+    @tagName.setter
+    def tagName(self, newtag):
+        self._tagName = newtag
+        self.setPhrase()
+
+    @property
+    def title(self):
+        return self._title
+
+    @title.setter
+    def title(self, title):
+        self._title = title
+        self.titleLabel.setText(self._title)
+
+
+class FilterTagEditor(QtWidgets.QFrame):
+    def __init__(self, parent=None):
+        super(FilterTagEditor, self).__init__(parent=parent)
         self.layout = QtWidgets.QVBoxLayout()
         self._buildLayout()
         self.setLayout(self.layout)
@@ -209,6 +331,22 @@ class FilterTag(QtWidgets.QFrame):
         self.btnDelete = ImagePushButton("./icons/delete.png", dimensions=(20, None))
         actionButtonsLayout.addWidget(self.btnDelete)
         self.layout.addLayout(actionButtonsLayout)
+
+    @property
+    def action(self):
+        return self.cbAction.currentText()
+
+    @action.setter
+    def action(self, newAction):
+        self.cbAction.setCurrentText(newAction)
+
+    @property
+    def tagName(self):
+        return self.cbTags.currentText()
+
+    @tagName.setter
+    def tagName(self, newTag):
+        self.cbTags.setCurrentText(newTag)
 
 
 class StetsonHPMMainWindow(QtWidgets.QMainWindow):
@@ -302,13 +440,115 @@ class SHPMProjectBrowserFilter(QtWidgets.QFrame):
         self.setFrameShape(QtWidgets.QFrame.StyledPanel)
 
     def _buildLayout(self):
-        self.layout.addWidget(FilterTag())
+        #self.layout.addWidget(FilterTag())
+
+        #list experiment
+        self.listModel = SHPMFilterListModel([FilterTag()], self)
+        self.listDelegate = SHPMFilterDelegate(self)
+        self.listView = QtWidgets.QListView()
+        self.listView.setVerticalScrollMode(
+            QtWidgets.QAbstractItemView.ScrollPerPixel)
+        self.listView.setModel(self.listModel)
+        self.listView.setItemDelegate(self.listDelegate)
+        self.layout.addWidget(self.listView)
+
+        self.layout.addWidget(FilterTagNewStyle())
+
         spacer = QtWidgets.QSpacerItem(
             10,
-            700,
+            70,
             QtWidgets.QSizePolicy.Expanding
             )
         self.layout.addItem(spacer)
+
+class SHPMFilterListModel(QtCore.QAbstractListModel):
+    def __init__(self, filterTypes, parent=None):
+        super(SHPMFilterListModel, self).__init__(parent=parent)
+        self.filterTypes = filterTypes
+
+    def data(self, index, role):
+        if index.isValid() and role == QtCore.Qt.DisplayRole:
+            return QtCore.QVariant(self.filterTypes[index.row()])
+        else:
+            return QtCore.QVariant()
+
+    def flags(self, index):
+        return QtCore.Qt.ItemIsEditable | QtCore.Qt.ItemIsEnabled | QtCore.Qt.ItemIsSelectable
+
+    def rowCount(self, parent=QtCore.QModelIndex()):
+        return len(self.filterTypes)
+
+
+class SHPMFilterDelegate(QtWidgets.QItemDelegate):
+    def _handleCloseEditor(self, editor):
+        self.commitData.emit(editor)
+        self.closeEditor.emit(editor)
+
+    def createEditor(self, parent, option, index):
+        filterType = index.data(QtCore.Qt.DisplayRole)
+        if isinstance(filterType, FilterTag):
+            filterEditor = FilterTagEditor(parent=parent)
+            filterEditor.btnDuplicate.clicked.connect(
+                lambda: self._handleCloseEditor(filterEditor)
+            )
+            return filterEditor
+
+    def paint(self, painter, option, index):
+        painter.save()
+        painter.setRenderHint(QtGui.QPainter.Antialiasing)
+
+        #backgroundColorSelected = QtCore.Qt.lightGray
+        backgroundColorSelected = QtGui.QColor(232, 235, 250)
+
+        # item background
+        painter.setPen(QtGui.QPen(QtCore.Qt.NoPen))
+        if option.state & QtWidgets.QStyle.State_Selected:
+            painter.setBrush(QtGui.QBrush(backgroundColorSelected))
+        else:
+            painter.setBrush(QtGui.QBrush(QtCore.Qt.white))
+        painter.drawRect(option.rect)
+
+        # item
+        item = index.data(QtCore.Qt.DisplayRole)
+        if not item:
+            return
+        fontMed10 = QtGui.QFont("Roboto", 10, QtGui.QFont.Medium)
+        fontBold14 = QtGui.QFont("Roboto", 14, QtGui.QFont.Bold)
+        framePadding = 10
+
+        coords = list(option.rect.getCoords())
+        coords[0] += framePadding
+        coords[1] += framePadding
+        painter.setPen(QtGui.QPen(QtCore.Qt.black))
+        painter.setFont(fontBold14)
+        painter.drawText(QtCore.QRect(*coords), QtCore.Qt.AlignLeft, item.title)
+
+        coords[1] += 30
+        painter.setPen(QtGui.QPen(QtCore.Qt.black))
+        painter.setFont(fontMed10)
+        painter.drawText(QtCore.QRect(*coords), QtCore.Qt.AlignLeft, item.phrase)
+
+        painter.restore()
+
+    def setEditorData(self, editor, index):
+        editor.blockSignals(True)
+        item = index.data(QtCore.Qt.DisplayRole)
+        editor.action = item.searchType
+        editor.tagName = item.tagName
+        editor.blockSignals(False)
+
+    def setModelData(self, editor, model, index):
+        if isinstance(index.data(), FilterTag):
+            newWord = "Allen"  # really, get this from the editor
+            index.data().searchType = editor.action
+            index.data().tagName = editor.tagName
+            model.setData(index, index.data())
+        else:
+            super(SHPMFilterDelegate, self).setModelData(editor, model, index)
+
+    def sizeHint(self, option, index):
+        size = QtCore.QSize(100, 100)
+        return size
 
 
 class SHPMProjectBrowserDelegate(QtWidgets.QItemDelegate):
@@ -340,13 +580,9 @@ class SHPMProjectBrowserDelegate(QtWidgets.QItemDelegate):
         # Common Fonts
         font10 = QtGui.QFont("Roboto", 10, QtGui.QFont.Normal)
         fontMed10 = QtGui.QFont("Roboto", 10, QtGui.QFont.Medium)
-        fontMed9 = QtGui.QFont("Arial", 9, QtGui.QFont.Medium)
         fontMed20 = QtGui.QFont("Roboto", 20, QtGui.QFont.Medium)
         fontBold10 = QtGui.QFont("Roboto", 10, QtGui.QFont.Bold)
-        fontBold14 = QtGui.QFont("Arial", 14, QtGui.QFont.Bold)
-        fontBold20 = QtGui.QFont("Arial", 20, QtGui.QFont.Bold)
         fontBold25 = QtGui.QFont("Roboto", 25, QtGui.QFont.Bold)
-        fontBold30 = QtGui.QFont("Arial", 30, QtGui.QFont.Bold)
 
         # ---------- utility for tagging --------
         def paintTag(tag, color, coords):
@@ -655,9 +891,6 @@ class SHPMProjectBrowserDelegate(QtWidgets.QItemDelegate):
         grad.setColorAt(0, QtGui.QColor(235, 235, 235))
         grad.setColorAt(1, QtGui.QColor(255, 255, 255))
         painter.fillRect(shadowRect, grad)
-
-
-
 
         painter.restore()
 
