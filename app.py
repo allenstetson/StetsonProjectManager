@@ -17,44 +17,40 @@ TAG_COLORS = {
     "grey":   ((238, 238, 238), (0, 0, 0)),
 }
 
+#################
+# Decorators
+#################
+def styledQt(cls):
+    init = cls.__init__
+    def __init__(self, *args, **kwargs):
+        init(self, *args, **kwargs)
+        with open("./stylesheet.css") as fh:
+            self.setStyleSheet(fh.read())
+    cls.__init__ = __init__
+    return cls
 
+
+#################
+# Classes
+#################
 class ClickableLabel(QtWidgets.QLabel):
     clicked = QtCore.pyqtSignal()
     def __init__(self, labelText, color=None, parent=None):
         super(ClickableLabel, self).__init__(parent=parent)
-        self.__stop = False
-        self._styleSheetAdditions = ""
         self.labelText = labelText
         self._build()
-        self.color = color or "blue"
-        self.setStyleSheet("color: {};".format(self.color))
 
     def _build(self):
         self.setText(self.labelText)
         self.installEventFilter(self)
 
-    def addToStyleSheet(self, stuffToAdd, replace=False):
-        self._styleSheetAdditions += stuffToAdd
-        if replace:
-            self._styleSheetAdditions = stuffToAdd
-        self.setStyleSheet("color: {}; {}".format(
-            self.color, self._styleSheetAdditions))
-
     def eventFilter(self, obj, event):
         if event.type() == QtCore.QEvent.Enter:
-            styleSheetText = (
-                "color: {}; text-decoration: underline; {}")
-            styleSheetText = \
-                styleSheetText.format(self.color, self._styleSheetAdditions)
+            styleSheetText = ("text-decoration: underline;")
             self.setStyleSheet(styleSheetText)
-            self.__stop = True
         elif event.type() == QtCore.QEvent.Leave:
-            styleSheetText = (
-                "color: {}; text-decoration: none; {}")
-            styleSheetText = \
-                styleSheetText.format(self.color, self._styleSheetAdditions)
+            styleSheetText = ("text-decoration: none;")
             self.setStyleSheet(styleSheetText)
-            self.__stop = False
         return False
 
     def mousePressEvent(self, event):
@@ -65,17 +61,18 @@ class ClickableLabel(QtWidgets.QLabel):
 class ComboBoxCompleter(QtWidgets.QComboBox):
     def __init__(self, parent=None):
         super(ComboBoxCompleter, self).__init__(parent=parent)
+        self.setEditable(True)
         self.completer = QtWidgets.QCompleter(self)
         self.completer.setCompletionMode(
             QtWidgets.QCompleter.UnfilteredPopupCompletion)
         self.completer.setPopup(self.view())
+        self.completer.popup().setObjectName("ComboBoxCompleterList")
         self.filterProxyModel = QtCore.QSortFilterProxyModel(self)
         self.filterProxyModel.setFilterCaseSensitivity(QtCore.Qt.CaseInsensitive)
         self.model = QtGui.QStandardItemModel()
 
         self.setCompleter(self.completer)
         self.setModel(self.model)
-        self.setEditable(True)
         self.setFocusPolicy = QtCore.Qt.StrongFocus
 
         self.lineEdit().textEdited.connect(
@@ -262,36 +259,61 @@ class ImagePushButton(QtWidgets.QPushButton):
         self.update()
 
 
+@styledQt
 class FilterTagNewStyle(QtWidgets.QFrame):
-    def __init__(self, parent=None):
+    def __init__(self, include=True, parent=None):
         super(FilterTagNewStyle, self).__init__(parent=parent)
+        self.include = include
         self.layout = QtWidgets.QVBoxLayout()
-
         self._buildLayout()
         self.setLayout(self.layout)
 
     def _buildLayout(self):
-        title = QtWidgets.QLabel("Filter by Tag")
-        title.setStyleSheet("font: 12px Roboto, sans-serif; "
-            "font-weight: bold;")
-        self.layout.addWidget(title)
-
         # Include Tags line
         inclTagsLineLayout = QtWidgets.QHBoxLayout()
-        inclTagsLineLayout.addWidget(QtWidgets.QLabel("Include Tags ("))
-        self.btnClearFilter = ClickableLabel("Clear tags")
-        self.btnClearFilter.addToStyleSheet("font: 12px Roboto, sans-serif;")
+        inclTagsLineLayout.setContentsMargins(0, 0, 0, 0)
+        if self.include:
+            title = QtWidgets.QLabel("INCLUDE TAGS (")
+        else:
+            title = QtWidgets.QLabel("EXCLUDE TAGS (")
+        title.setObjectName("filterTitle")
+        inclTagsLineLayout.addWidget(title)
+        self.btnClearFilter = ClickableLabel("Clear")
         self.btnClearFilter.clicked.connect(self.clearTags)
         inclTagsLineLayout.addWidget(self.btnClearFilter)
-        inclTagsLineLayout.addWidget(QtWidgets.QLabel(")"))
+        endParen = QtWidgets.QLabel(")")
+        endParen.setObjectName("filterTitle")
+        inclTagsLineLayout.addWidget(endParen)
         self.layout.addLayout(inclTagsLineLayout)
 
+        # Combo Box
         self.cbCompleterTag = ComboBoxCompleter(self)
         self.layout.addWidget(self.cbCompleterTag)
         self.cbCompleterTag.addItems(["home", "alexa", "demoreel", "nerf"])
 
+        # Scroll Area with List
+        scrollAreaList = QtWidgets.QScrollArea()
+        scrollAreaList.setMinimumHeight(125)
+        scrollAreaList.setMaximumHeight(125)
+        itemList = QtWidgets.QWidget()
+        itemListLayout = QtWidgets.QVBoxLayout()
+        itemList.setLayout(itemListLayout)
+        for thing in sorted(["Demoreel", "Alexa", "Nerf", "Home", "Church",
+                      "Arduino", "NAS", "Video Production"]):
+            chkbx = QtWidgets.QCheckBox(thing, self)
+            self.box = chkbx
+            if self.include and thing in ["Alexa", "Home"]:
+                chkbx.setChecked(True)
+            itemListLayout.addWidget(chkbx)
+        self.layout.addWidget(scrollAreaList)
+        scrollAreaList.setWidget(itemList)
+
+        line = QHLine()
+        self.layout.addWidget(line)
+
     def clearTags(self):
         print("Now clearing tags")
+        print("CHECKED: {}".format(self.box.isChecked()))
 
 
 class FilterTag(QtWidgets.QFrame):
@@ -418,6 +440,7 @@ class StetsonHPMMainWindow(QtWidgets.QMainWindow):
         self.setCentralWidget(StetsonHPMMainWidget(self))
 
 
+@styledQt
 class StetsonHPMMainWidget(QtWidgets.QFrame):
     """Main widget for Stetson HPM.
 
@@ -483,33 +506,23 @@ class SHPMProjectBrowser(QtWidgets.QFrame):
         self.setLayout(self.layout)
 
 
+@styledQt
 class SHPMProjectBrowserFilter(QtWidgets.QFrame):
     def  __init__(self, parent=None, *args, **kwargs):
         super(SHPMProjectBrowserFilter, self).__init__(parent=parent, *args, **kwargs)
         self.layout = QtWidgets.QVBoxLayout()
         self._buildLayout()
         self.setLayout(self.layout)
-        self.setMaximumWidth(200)
+        self.setMaximumWidth(250)
         self.setFrameShape(QtWidgets.QFrame.StyledPanel)
 
     def _buildLayout(self):
-        #self.layout.addWidget(FilterTag())
-
-        #list experiment
-        self.listModel = SHPMFilterListModel([FilterTag()], self)
-        self.listDelegate = SHPMFilterDelegate(self)
-        self.listView = QtWidgets.QListView()
-        self.listView.setVerticalScrollMode(
-            QtWidgets.QAbstractItemView.ScrollPerPixel)
-        self.listView.setModel(self.listModel)
-        self.listView.setItemDelegate(self.listDelegate)
-        self.layout.addWidget(self.listView)
-
         self.layout.addWidget(FilterTagNewStyle())
+        self.layout.addWidget(FilterTagNewStyle(include=False))
 
         spacer = QtWidgets.QSpacerItem(
             10,
-            70,
+            700,
             QtWidgets.QSizePolicy.Expanding
             )
         self.layout.addItem(spacer)
@@ -550,8 +563,7 @@ class SHPMFilterDelegate(QtWidgets.QItemDelegate):
         painter.save()
         painter.setRenderHint(QtGui.QPainter.Antialiasing)
 
-        #backgroundColorSelected = QtCore.Qt.lightGray
-        backgroundColorSelected = QtGui.QColor(232, 235, 250)
+        backgroundColorSelected = QtGui.QColor(230, 240, 248)
 
         # item background
         painter.setPen(QtGui.QPen(QtCore.Qt.NoPen))
@@ -611,8 +623,7 @@ class SHPMProjectBrowserDelegate(QtWidgets.QItemDelegate):
         painter.save()
         painter.setRenderHint(QtGui.QPainter.HighQualityAntialiasing)
 
-        #backgroundColorSelected = QtCore.Qt.lightGray
-        backgroundColorSelected = QtGui.QColor(232, 235, 250)
+        backgroundColorSelected = QtGui.QColor(230, 240, 248)
 
         # item background
         painter.setPen(QtGui.QPen(QtCore.Qt.NoPen))
@@ -670,8 +681,8 @@ class SHPMProjectBrowserDelegate(QtWidgets.QItemDelegate):
             shadowRect.topRight(),
             shadowRect.bottomRight()
         )
-        grad.setColorAt(0, QtGui.QColor(255, 255, 255))
-        grad.setColorAt(1, QtGui.QColor(235, 235, 235))
+        grad.setColorAt(0, QtGui.QColor(246, 248, 250))
+        grad.setColorAt(1, QtGui.QColor(243, 247, 251))
         painter.fillRect(shadowRect, grad)
 
         # --------- top row ----------
@@ -941,8 +952,8 @@ class SHPMProjectBrowserDelegate(QtWidgets.QItemDelegate):
             shadowRect.topRight(),
             shadowRect.bottomRight()
         )
-        grad.setColorAt(0, QtGui.QColor(235, 235, 235))
-        grad.setColorAt(1, QtGui.QColor(255, 255, 255))
+        grad.setColorAt(0, QtGui.QColor(243, 247, 251))
+        grad.setColorAt(1, QtGui.QColor(246, 248, 250))
         painter.fillRect(shadowRect, grad)
 
         painter.restore()
@@ -993,6 +1004,11 @@ class SHPMProjectInspector(QtWidgets.QFrame):
         self.layout.addWidget(mylabel)
         self.setLayout(self.layout)
 
+class QHLine(QtWidgets.QFrame):
+    def __init__(self, parent=None):
+        super(QHLine, self).__init__(parent=parent)
+        self.setFrameShape(QtWidgets.QFrame.HLine)
+        self.setFrameShadow(QtWidgets.QFrame.Sunken)
 
 
 def main():
