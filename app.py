@@ -1,5 +1,6 @@
 
 # std imports
+import datetime
 import os
 import sys
 
@@ -259,6 +260,107 @@ class ImagePushButton(QtWidgets.QPushButton):
         self.update()
 
 
+class TimeSpinBox(QtWidgets.QSpinBox):
+    def textFromValue(self, num):
+        return str(num).rjust(2, "0")
+
+
+class TimePicker(QtWidgets.QFrame):
+    def __init__(self, parent=None):
+        super(TimePicker, self).__init__(parent=parent)
+        startSpacer = QtWidgets.QSpacerItem(
+            1,
+            3,
+            QtWidgets.QSizePolicy.MinimumExpanding)
+        self.layout = QtWidgets.QHBoxLayout()
+        self.hourBox = TimeSpinBox(self)
+        self.hourBox.setRange(1, 12)
+        self.minBox = TimeSpinBox(self)
+        self.minBox.setRange(0, 59)
+        self.ampm = QtWidgets.QComboBox(self)
+        self.ampm.addItems(["AM", "PM"])
+        endSpacer = QtWidgets.QSpacerItem(
+            1,
+            3,
+            QtWidgets.QSizePolicy.MinimumExpanding)
+        self.layout.addItem(startSpacer)
+        self.layout.addWidget(self.hourBox)
+        self.layout.addWidget(self.minBox)
+        self.layout.addWidget(self.ampm)
+        self.layout.addItem(endSpacer)
+        self.setLayout(self.layout)
+
+class DatePopup(QtWidgets.QDateTimeEdit):
+    def __init__(self, before=True, *args, **kwargs):
+        super(DatePopup, self).__init__(*args, **kwargs, calendarPopup=True)
+        self.todayButton = QtWidgets.QPushButton(self.tr("Today"))
+        self.todayButton.clicked.connect(self.updateToday)
+        self.calendarWidget().layout().addWidget(self.todayButton)
+        self.addTime()
+        self.calendarWidget().setMinimumHeight(250)
+        if before:
+            self.setDateTime(QtCore.QDateTime.currentDateTime())
+        else:
+            past = datetime.datetime(2000, 1, 1)
+            self.setDateTime(QtCore.QDateTime(past))
+        self.dateChanged.connect(self._setTime)
+
+    def _setTime(self):
+        hour = self.timePicker.hourBox.value()
+        minute = self.timePicker.minBox.value()
+        ampm = self.timePicker.ampm.currentText()
+        if ampm == "PM":
+            hour = hour + 12
+            if hour == 24:
+                hour = 12
+        time = QtCore.QTime(hour, minute)
+        self.setTime(time)
+
+    def addTime(self):
+        self.timePicker = TimePicker(parent=self)
+        self.calendarWidget().layout().addWidget(self.timePicker)
+
+    def updateToday(self):
+        self.todayButton.clearFocus()
+        today = QtCore.QDate.currentDate()
+        self.calendarWidget().setSelectedDate(today)
+
+
+class FilterDateTime(QtWidgets.QFrame):
+    def __init__(self, dateType=None, *args, **kwargs):
+        super(FilterDateTime, self).__init__(*args, **kwargs)
+        self.dateType = dateType or "modified"
+        self.layout = QtWidgets.QVBoxLayout()
+        self._buildLayout()
+        self.setLayout(self.layout)
+
+    def _buildLayout(self):
+        if self.dateType == "modified":
+            title = QtWidgets.QLabel("LAST MODIFIED")
+        else:
+            title = QtWidgets.QLabel("CREATED")
+        title.setObjectName("filterTitle")
+        self.layout.addWidget(title)
+
+        beforeRow = QtWidgets.QHBoxLayout()
+        before = QtWidgets.QLabel("before")
+        #before.setObjectName("filterTitle")
+        beforeRow.addWidget(before)
+
+        self.datePopup = DatePopup(before=True, parent=self)
+        beforeRow.addWidget(self.datePopup)
+        self.layout.addLayout(beforeRow)
+
+        afterRow = QtWidgets.QHBoxLayout()
+        after = QtWidgets.QLabel("after")
+        #after.setObjectName("filterTitle")
+        afterRow.addWidget(after)
+
+        self.datePopup = DatePopup(before=False, parent=self)
+        afterRow.addWidget(self.datePopup)
+        self.layout.addLayout(afterRow)
+
+
 @styledQt
 class FilterTagNewStyle(QtWidgets.QFrame):
     def __init__(self, include=True, parent=None):
@@ -284,6 +386,11 @@ class FilterTagNewStyle(QtWidgets.QFrame):
         endParen = QtWidgets.QLabel(")")
         endParen.setObjectName("filterTitle")
         inclTagsLineLayout.addWidget(endParen)
+        spacer = QtWidgets.QSpacerItem(
+            10,
+            1,
+            QtWidgets.QSizePolicy.Expanding)
+        inclTagsLineLayout.addItem(spacer)
         self.layout.addLayout(inclTagsLineLayout)
 
         # Combo Box
@@ -294,7 +401,7 @@ class FilterTagNewStyle(QtWidgets.QFrame):
         # Scroll Area with List
         scrollAreaList = QtWidgets.QScrollArea()
         scrollAreaList.setMinimumHeight(125)
-        scrollAreaList.setMaximumHeight(125)
+        #scrollAreaList.setMaximumHeight(125)
         itemList = QtWidgets.QWidget()
         itemListLayout = QtWidgets.QVBoxLayout()
         itemList.setLayout(itemListLayout)
@@ -308,13 +415,13 @@ class FilterTagNewStyle(QtWidgets.QFrame):
         self.layout.addWidget(scrollAreaList)
         scrollAreaList.setWidget(itemList)
 
-        line = QHLine()
-        self.layout.addWidget(line)
-
     def clearTags(self):
         print("Now clearing tags")
         print("CHECKED: {}".format(self.box.isChecked()))
 
+    #def sizeHint(self):
+    #    size = QtCore.QSize(250, 125)
+    #    return size
 
 class FilterTag(QtWidgets.QFrame):
     def __init__(self, parent=None):
@@ -518,14 +625,27 @@ class SHPMProjectBrowserFilter(QtWidgets.QFrame):
 
     def _buildLayout(self):
         self.layout.addWidget(FilterTagNewStyle())
+        line = QHLine(self)
+        self.layout.addWidget(line)
+
         self.layout.addWidget(FilterTagNewStyle(include=False))
+        line = QHLine(self)
+        self.layout.addWidget(line)
+
+        self.layout.addWidget(FilterDateTime())
+        line = QHLine(self)
+        self.layout.addWidget(line)
+
+        self.layout.addWidget(FilterDateTime(dateType="created"))
+        line = QHLine(self)
+        self.layout.addWidget(line)
 
         spacer = QtWidgets.QSpacerItem(
             10,
             700,
             QtWidgets.QSizePolicy.Expanding
             )
-        self.layout.addItem(spacer)
+        #self.layout.addItem(spacer)
 
 class SHPMFilterListModel(QtCore.QAbstractListModel):
     def __init__(self, filterTypes, parent=None):
@@ -1007,8 +1127,12 @@ class SHPMProjectInspector(QtWidgets.QFrame):
 class QHLine(QtWidgets.QFrame):
     def __init__(self, parent=None):
         super(QHLine, self).__init__(parent=parent)
-        self.setFrameShape(QtWidgets.QFrame.HLine)
-        self.setFrameShadow(QtWidgets.QFrame.Sunken)
+        #self.setFrameShape(QtWidgets.QFrame.HLine)
+        #self.setFrameShadow(QtWidgets.QFrame.Sunken)
+        self.setMinimumHeight(1)
+        self.setMaximumHeight(1)
+        self.setStyleSheet("background: #d1dceb;")
+        self.setObjectName("QHLine")
 
 
 def main():

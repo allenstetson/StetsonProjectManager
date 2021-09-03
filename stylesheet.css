@@ -48,12 +48,6 @@ ComboBoxCompleter QAbstractItemView {
     selection-color: #a5aebb;
     selection-background-color: #0f4a7a;
 }
-
-QHLine {
-    border: 0px solid #d1dceb;
-    background-color: #d1dceb;
-}
-
 QCheckBox::indicator {
     background-color: #f9fbfc;
     color: #333333;
