@@ -149,8 +149,11 @@ def getProjectTypeFromProject(project):
     return project["PROJECT_TYPE"]
 
 
-def getTagsFromProject(project):
+def getTagsFromProject(project, extraTags=False):
     tags = project["TAGS"]
+    if extraTags:
+        tags.append(getProjectTypeFromProject(project))
+        tags.append(getCategoryFromProject(project))
     return tags
 
 

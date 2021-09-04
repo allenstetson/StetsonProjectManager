@@ -60,6 +60,7 @@ class ClickableLabel(QtWidgets.QLabel):
 
 
 class ComboBoxCompleter(QtWidgets.QComboBox):
+    textEditFinished = QtCore.pyqtSignal()
     def __init__(self, parent=None):
         super(ComboBoxCompleter, self).__init__(parent=parent)
         self.setEditable(True)
@@ -78,14 +79,18 @@ class ComboBoxCompleter(QtWidgets.QComboBox):
 
         self.lineEdit().textEdited.connect(
             self.filterProxyModel.setFilterFixedString)
+        self.lineEdit().returnPressed.connect(self._handleTextEditFinished)
         self.completer.activated.connect(self.setTextIfCompleterIsClicked)
+        self.currentIndexChanged.connect(self._handleTextEditFinished)
+
+    def _handleTextEditFinished(self):
+        self.textEditFinished.emit()
 
     def addItems(self, items):
         for i, word in enumerate(items):
             item = QtGui.QStandardItem(word)
             self.model.setItem(i, 0, item)
         self.setModelColumn(0)
-
 
     def setModel(self, model):
         super(ComboBoxCompleter, self).setModel(model)
@@ -407,6 +412,7 @@ class FilterTagNewStyle(QtWidgets.QFrame):
 
         # Combo Box
         self.cbCompleterTag = ComboBoxCompleter(self)
+        self.cbCompleterTag.textEditFinished.connect(self._toggleCheckBox)
         self.layout.addWidget(self.cbCompleterTag)
         self.cbCompleterTag.addItems(controller.getAllTags())
 
@@ -425,6 +431,23 @@ class FilterTagNewStyle(QtWidgets.QFrame):
     def _handleStateChange(self, state):
         sender = self.sender()
         self.boxStateChanged.emit(sender, state)
+
+    def _toggleCheckBox(self):
+        tagName = self.cbCompleterTag.currentText()
+        index = self.itemListLayout.count()
+        while index >= 0:
+            item = self.itemListLayout.itemAt(index)
+            if not item:
+                index -= 1
+                continue
+            itemName = item.widget().text().lower()
+            if itemName == tagName:
+                if item.widget().isChecked():
+                    item.widget().setChecked(False)
+                else:
+                    item.widget().setChecked(True)
+                break
+            index -= 1
 
     def clearTags(self):
         index = self.itemListLayout.count()
@@ -1292,7 +1315,7 @@ class SHPMProjectBrowserListProxyModel(QtCore.QSortFilterProxyModel):
             species, filterData = filterObject.getFilterData()
             # TAGS
             if species == "tag":
-                pTags = controller.getTagsFromProject(itemData)
+                pTags = controller.getTagsFromProject(itemData, extraTags=True)
                 iTags = filterData.get("include", [])
                 eTags = filterData.get("exclude", [])
                 if iTags and not any([x for x in iTags if x in pTags]):
