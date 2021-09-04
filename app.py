@@ -1309,8 +1309,6 @@ class SHPMProjectBrowserListProxyModel(QtCore.QSortFilterProxyModel):
     def filterAcceptsRow(self, sourceRow, sourceParent):
         idx = self.sourceModel().index(sourceRow, 0, sourceParent).row()
         itemData = self.sourceModel().listData[idx]
-        #if "jisun" in itemData.get('USER_CONTRIBUTORS', []):
-        #    return False
         for filterObject in self._registeredFilters:
             species, filterData = filterObject.getFilterData()
             # TAGS
