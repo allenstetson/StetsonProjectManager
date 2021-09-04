@@ -2,18 +2,35 @@
 import datetime
 import os
 
-from PyQt5 import QtGui
+from PyQt5 import QtGui, QtWidgets
 
 import projects
+
+USING_SAMPLE_DATA = True
+
+
+def getAllCategories():
+    # TODO: implement me
+    return sorted(["home", "church", "school"])
 
 
 def getAllProjects():
     return projects.getAllProjectsForPath("/mnt/y")
 
 
+def getAllProjectTypes():
+    # TODO: implement me
+    return sorted(["music", "video", "alexa"])
+
+
 def getAllTags():
-    # implement me
-    return (["home", "alexa", "nerf", "demoreel"])
+    # TODO: implement me
+    allTags = []
+    allTags.extend(getAllCategories())
+    allTags.extend(getAllProjectTypes())
+    allTags.extend(["nerf", "demoreel", "alexa", "arduino", "nas", "music",
+                    "bass", "st. kilian", "bathgate", "violin", "ethan"])
+    return sorted(set(allTags))
 
 def getCategoryFromProject(project):
     if not "PROJECT_CATEGORY" in project:
@@ -21,17 +38,25 @@ def getCategoryFromProject(project):
     return project["PROJECT_CATEGORY"]
 
 
-def getContributorsFromProject(project):
+def getContributorsFromProject(project, icons=True):
     if not "USER_CONTRIBUTORS" in project:
         return []
     contributors = []
     for contributor in sorted(project["USER_CONTRIBUTORS"]):
-        imagePath = "icons/{}.png".format(contributor.lower())
-        if not os.path.exists("./" + imagePath):
-            pass
-        pixmap = QtGui.QPixmap(imagePath)
-        pixmap = pixmap.scaledToHeight(25)
-        contributors.append(pixmap)
+        if not icons:
+            contributors.append(contributor.lower())
+            continue
+        pixmap = None
+        if USING_SAMPLE_DATA:
+            imagePath = "samples/{}.png".format(contributor.lower())
+            if not os.path.exists("./" + imagePath):
+                pixmap = QtGui.QPixmap("icons/user.png")
+            pixmap = QtGui.QPixmap(imagePath)
+        else:
+            pixmap = database.getImageForUser(contributor.lower())
+        if pixmap:
+            pixmap = pixmap.scaledToHeight(25)
+            contributors.append(pixmap)
     return contributors
 
 
@@ -66,6 +91,18 @@ def getFileTypesFromProject(project):
             returnTypes += ", " + fileType
     return returnTypes
 
+
+def getIconForUser(userName):
+    if USING_SAMPLE_DATA:
+        imagePath = "samples/{}.png".format(userName)
+        if not os.path.exists("./" + imagePath):
+            icon = QtGui.QIcon("icons/user.png")
+        else:
+            icon = QtGui.QIcon(imagePath)
+        return icon
+    else:
+        # Get this from the database
+        pass
 
 def getIntegrationsFromProject(project):
     if not "INTEGRATIONS" in project:
@@ -124,21 +161,29 @@ def getTitleFromProject(project):
 def getThumbnailFromProject(project):
     if not "THUMBNAIL" in project:
         return None
-    thumbPath = project["THUMBNAIL"]
-    if not os.path.exists(thumbPath):
-        thumbPath = "icons/project_unknown.png"
-    pixmap = QtGui.QPixmap(thumbPath)
+    if USING_SAMPLE_DATA:
+        thumbPath = project["THUMBNAIL_PATH"]
+        if not os.path.exists(thumbPath):
+            thumbPath = "icons/project_unknown.png"
+        pixmap = QtGui.QPixmap(thumbPath)
+    else:
+        pixmap = project["THUMBNAIL"]
     pixmap = pixmap.scaledToHeight(80)
     return pixmap
 
 
-def getUserCreatedFromProject(project):
+def getUserCreatedFromProject(project, icon=True):
     if not "USER_CREATED" in project:
         return None
-    iconPath = "icons/{}.png".format(project["USER_CREATED"])
-    if not os.path.exists("./" + iconPath):
-        iconPath = "icons/user.png"
-    userCreated = QtGui.QPixmap(iconPath)
+    if not icon:
+        return project["USER_CREATED"].lower()
+    if USING_SAMPLE_DATA:
+        iconPath = "samples/{}.png".format(project["USER_CREATED"])
+        if not os.path.exists("./" + iconPath):
+            iconPath = "samples/user.png"
+        userCreated = QtGui.QPixmap(iconPath)
+    else:
+        userCreated = database.getImageForUser(project["USER_CREATED"])
     userCreated = userCreated.scaledToHeight(25)
     return userCreated
 
@@ -146,9 +191,29 @@ def getUserCreatedFromProject(project):
 def getUserModifiedFromProject(project):
     if not "USER_MODIFIED" in project:
         return None
-    iconPath = "icons/{}.png".format(project["USER_MODIFIED"])
-    if not os.path.exists("./" + iconPath):
-        iconPath = "icons/user.png"
-    userModified = QtGui.QPixmap(iconPath)
+    if USING_SAMPLE_DATA:
+        iconPath = "samples/{}.png".format(project["USER_MODIFIED"])
+        if not os.path.exists("./" + iconPath):
+            iconPath = "samples/user.png"
+        userModified = QtGui.QPixmap(iconPath)
+    else:
+        userModified = database.getImageForUser(project["USER_CREATED"])
     userModified = userModified.scaledToHeight(25)
     return userModified
+
+
+def getAllUsersCreated():
+    #Pull this from the DB eventually
+    return ["allen", "asher", "jisun", "jonah", "owen"]
+
+
+def getAllUsersModified():
+    #Pull this from the DB eventually
+    return ["allen", "asher", "jisun", "jonah", "owen"]
+
+def registerProjectBrowserFilter(filterObject):
+    widgets = QtWidgets.QApplication.instance().allWidgets()
+    for widget in widgets:
+        if "__main__.SHPMProjectBrowser" ==  str(widget.__class__).split("'")[1]:
+            widget.registerFilter(filterObject)
+            break

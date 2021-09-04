@@ -333,6 +333,7 @@ class FilterDateTime(QtWidgets.QFrame):
         self.layout = QtWidgets.QVBoxLayout()
         self._buildLayout()
         self.setLayout(self.layout)
+        self.species = "dateTime"
 
     def _buildLayout(self):
         if self.dateType == "modified":
@@ -347,8 +348,8 @@ class FilterDateTime(QtWidgets.QFrame):
         #before.setObjectName("filterTitle")
         beforeRow.addWidget(before)
 
-        self.datePopup = DatePopup(before=True, parent=self)
-        beforeRow.addWidget(self.datePopup)
+        self.datePopupBefore = DatePopup(before=True, parent=self)
+        beforeRow.addWidget(self.datePopupBefore)
         self.layout.addLayout(beforeRow)
 
         afterRow = QtWidgets.QHBoxLayout()
@@ -356,19 +357,30 @@ class FilterDateTime(QtWidgets.QFrame):
         #after.setObjectName("filterTitle")
         afterRow.addWidget(after)
 
-        self.datePopup = DatePopup(before=False, parent=self)
-        afterRow.addWidget(self.datePopup)
+        self.datePopupAfter = DatePopup(before=False, parent=self)
+        afterRow.addWidget(self.datePopupAfter)
         self.layout.addLayout(afterRow)
+
+    def getFilterData(self):
+        species = self.species + self.dateType.title()
+        data = {
+            "before": self.datePopupBefore.dateTime(),
+            "after": self.datePopupAfter.dateTime()
+        }
+        return (species, data)
 
 
 @styledQt
 class FilterTagNewStyle(QtWidgets.QFrame):
+    boxStateChanged = QtCore.pyqtSignal(object, int)
     def __init__(self, include=True, parent=None):
         super(FilterTagNewStyle, self).__init__(parent=parent)
         self.include = include
         self.layout = QtWidgets.QVBoxLayout()
         self._buildLayout()
         self.setLayout(self.layout)
+        self.setMaximumHeight(200)
+        self.species = "tag"
 
     def _buildLayout(self):
         # Include Tags line
@@ -396,32 +408,69 @@ class FilterTagNewStyle(QtWidgets.QFrame):
         # Combo Box
         self.cbCompleterTag = ComboBoxCompleter(self)
         self.layout.addWidget(self.cbCompleterTag)
-        self.cbCompleterTag.addItems(["home", "alexa", "demoreel", "nerf"])
+        self.cbCompleterTag.addItems(controller.getAllTags())
 
         # Scroll Area with List
         scrollAreaList = QtWidgets.QScrollArea()
-        scrollAreaList.setMinimumHeight(125)
-        #scrollAreaList.setMaximumHeight(125)
         itemList = QtWidgets.QWidget()
-        itemListLayout = QtWidgets.QVBoxLayout()
-        itemList.setLayout(itemListLayout)
-        for thing in sorted(["Demoreel", "Alexa", "Nerf", "Home", "Church",
-                      "Arduino", "NAS", "Video Production"]):
-            chkbx = QtWidgets.QCheckBox(thing, self)
-            self.box = chkbx
-            if self.include and thing in ["Alexa", "Home"]:
-                chkbx.setChecked(True)
-            itemListLayout.addWidget(chkbx)
+        self.itemListLayout = QtWidgets.QVBoxLayout()
+        itemList.setLayout(self.itemListLayout)
+        for item in controller.getAllTags():
+            chkbx = QtWidgets.QCheckBox(item.title(), self)
+            chkbx.stateChanged.connect(self._handleStateChange)
+            self.itemListLayout.addWidget(chkbx)
         self.layout.addWidget(scrollAreaList)
         scrollAreaList.setWidget(itemList)
 
-    def clearTags(self):
-        print("Now clearing tags")
-        print("CHECKED: {}".format(self.box.isChecked()))
+    def _handleStateChange(self, state):
+        sender = self.sender()
+        self.boxStateChanged.emit(sender, state)
 
-    #def sizeHint(self):
-    #    size = QtCore.QSize(250, 125)
-    #    return size
+    def clearTags(self):
+        index = self.itemListLayout.count()
+        while index >= 0:
+            item = self.itemListLayout.itemAt(index)
+            if not item:
+                index -= 1
+                continue
+            item.widget().setChecked(False)
+            index -= 1
+
+    def getFilterData(self):
+        checkedTags = []
+        index = self.itemListLayout.count()
+        while index >= 0:
+            item = self.itemListLayout.itemAt(index)
+            if not item:
+                index -= 1
+                continue
+            if item.widget().isChecked():
+                tagName = item.widget().text().lower()
+                checkedTags.append(tagName)
+            index -= 1
+
+        species = self.species
+        if self.include:
+            keyword = "include"
+        else:
+            keyword = "exclude"
+        data = {keyword: checkedTags}
+        return (species, data)
+
+    def reactToStateChange(self, sender, state):
+        tagName = sender.text()
+
+        index = self.itemListLayout.count()
+        while index >= 0:
+            item = self.itemListLayout.itemAt(index)
+            if not item:
+                index -= 1
+                continue
+            if item.widget().text() == tagName:
+                item.widget().setEnabled(not state)
+                break
+            index -= 1
+
 
 class FilterTag(QtWidgets.QFrame):
     def __init__(self, parent=None):
@@ -531,6 +580,63 @@ class FilterTagEditor(QtWidgets.QFrame):
         self.cbTags.setCurrentText(newTag)
 
 
+@styledQt
+class FilterUser(QtWidgets.QFrame):
+    boxStateChanged = QtCore.pyqtSignal(object, int)
+    def __init__(self, mode=None, parent=None):
+        super(FilterUser, self).__init__(parent=parent)
+        self.mode = mode or "creator"
+        self.layout = QtWidgets.QVBoxLayout()
+        self._buildLayout()
+        self.setLayout(self.layout)
+        self.setMaximumHeight(200)
+        self.species = "user"
+
+    def _buildLayout(self):
+        # Title
+        title = QtWidgets.QLabel("{}".format(self.mode.upper()))
+        title.setObjectName("filterTitle")
+        self.layout.addWidget(title)
+
+        # Scroll Area with List
+        scrollAreaList = QtWidgets.QScrollArea()
+        itemList = QtWidgets.QWidget()
+        self.itemListLayout = QtWidgets.QVBoxLayout()
+        itemList.setLayout(self.itemListLayout)
+        if self.mode == "creator":
+            users = controller.getAllUsersCreated()
+        else:
+            users = controller.getAllUsersModified()
+        for user in users:
+            chkbx = QtWidgets.QCheckBox(user, self)
+            chkbx.setIcon(controller.getIconForUser(user))
+            chkbx.stateChanged.connect(self._handleStateChange)
+            self.itemListLayout.addWidget(chkbx)
+        self.layout.addWidget(scrollAreaList)
+        scrollAreaList.setWidget(itemList)
+
+    def _handleStateChange(self, state):
+        sender = self.sender()
+        self.boxStateChanged.emit(sender, state)
+
+    def getFilterData(self):
+        species = self.species + self.mode.title()
+        return (species, self.getSelectedUsers())
+
+    def getSelectedUsers(self):
+        users = []
+        index = self.itemListLayout.count()
+        while index >= 0:
+            item = self.itemListLayout.itemAt(index)
+            if not item:
+                index -= 1
+                continue
+            if item.widget().isChecked() and item.widget().isEnabled():
+                users.append(item.widget().text())
+            index -= 1
+        return sorted(users)
+
+
 class StetsonHPMMainWindow(QtWidgets.QMainWindow):
     """Main window for Stetson HPM, containing the main widget.
 
@@ -584,12 +690,12 @@ class SHPMTopBar(QtWidgets.QFrame):
         self.layout.addItem(spacer)
 
         self.profilePicture = QtWidgets.QLabel()
-        pixmap = QtGui.QPixmap("icons/allen.png")
+        pixmap = QtGui.QPixmap("samples/allen.png")
         self.profilePicture.setPixmap(
             pixmap.scaledToHeight(50)
             )
+        self.profilePicture.setAttribute(QtCore.Qt.WA_TranslucentBackground)
         self.layout.addWidget(self.profilePicture)
-        self.setStyleSheet("background: #CCCCCC;")
         self.setLayout(self.layout)
 
 
@@ -603,18 +709,28 @@ class SHPMWindowStack(QtWidgets.QStackedWidget):
 
 
 class SHPMProjectBrowser(QtWidgets.QFrame):
+    projectBrowserFilterChanged = QtCore.pyqtSignal()
     def  __init__(self, parent=None):
         super(SHPMProjectBrowser, self).__init__(parent=parent)
+        self.filters = []
         self.layout = QtWidgets.QHBoxLayout()
+        self.projectList = SHPMProjectBrowserList(parent=self)
+        self.projectFilter = SHPMProjectBrowserFilter(parent=self)
         self.browserSplitter = QtWidgets.QSplitter(QtCore.Qt.Horizontal)
-        self.browserSplitter.addWidget(SHPMProjectBrowserFilter(parent=self))
-        self.browserSplitter.addWidget(SHPMProjectBrowserList(parent=self))
+        self.browserSplitter.addWidget(self.projectFilter)
+        self.browserSplitter.addWidget(self.projectList)
+        # Connect filter to list
+        self.projectFilter.dirtyFilter.connect(self.projectList.filterList)
         self.layout.addWidget(self.browserSplitter)
         self.setLayout(self.layout)
+
+    def registerFilter(self, filterObject):
+        self.projectList.registerFilter(filterObject)
 
 
 @styledQt
 class SHPMProjectBrowserFilter(QtWidgets.QFrame):
+    dirtyFilter = QtCore.pyqtSignal()
     def  __init__(self, parent=None, *args, **kwargs):
         super(SHPMProjectBrowserFilter, self).__init__(parent=parent, *args, **kwargs)
         self.layout = QtWidgets.QVBoxLayout()
@@ -624,28 +740,67 @@ class SHPMProjectBrowserFilter(QtWidgets.QFrame):
         self.setFrameShape(QtWidgets.QFrame.StyledPanel)
 
     def _buildLayout(self):
-        self.layout.addWidget(FilterTagNewStyle())
-        line = QHLine(self)
-        self.layout.addWidget(line)
+        panelScrollArea = QtWidgets.QScrollArea()
+        panelScrollWidget = QtWidgets.QWidget()
+        panelScrollWidget.setMinimumHeight(1000)
+        panelScrollLayout = QtWidgets.QVBoxLayout()
 
-        self.layout.addWidget(FilterTagNewStyle(include=False))
+        self.filterTagInclude = FilterTagNewStyle()
+        controller.registerProjectBrowserFilter(self.filterTagInclude)
+        panelScrollLayout.addWidget(self.filterTagInclude)
         line = QHLine(self)
-        self.layout.addWidget(line)
+        panelScrollLayout.addWidget(line)
 
-        self.layout.addWidget(FilterDateTime())
+        self.filterTagExclude = FilterTagNewStyle(include=False)
+        controller.registerProjectBrowserFilter(self.filterTagExclude)
+        panelScrollLayout.addWidget(self.filterTagExclude)
         line = QHLine(self)
-        self.layout.addWidget(line)
+        panelScrollLayout.addWidget(line)
 
-        self.layout.addWidget(FilterDateTime(dateType="created"))
+        # Connect mutually exclusive widgets
+        self.filterTagInclude.boxStateChanged.connect(
+                self.filterTagExclude.reactToStateChange)
+        self.filterTagExclude.boxStateChanged.connect(
+                self.filterTagInclude.reactToStateChange)
+
+        self.filterDateTimeModified = FilterDateTime(dateType="modified")
+        controller.registerProjectBrowserFilter(self.filterDateTimeModified)
+        panelScrollLayout.addWidget(self.filterDateTimeModified)
         line = QHLine(self)
-        self.layout.addWidget(line)
+        panelScrollLayout.addWidget(line)
 
-        spacer = QtWidgets.QSpacerItem(
-            10,
-            700,
-            QtWidgets.QSizePolicy.Expanding
-            )
-        #self.layout.addItem(spacer)
+        self.filterDateTimeCreated = FilterDateTime(dateType="created")
+        controller.registerProjectBrowserFilter(self.filterDateTimeCreated)
+        panelScrollLayout.addWidget(self.filterDateTimeCreated)
+        line = QHLine(self)
+        panelScrollLayout.addWidget(line)
+
+        self.filterUserCreated = FilterUser(mode="creator")
+        controller.registerProjectBrowserFilter(self.filterUserCreated)
+        panelScrollLayout.addWidget(self.filterUserCreated)
+        line = QHLine(self)
+        panelScrollLayout.addWidget(line)
+
+        self.filterUserContributor = FilterUser(mode="contributor")
+        controller.registerProjectBrowserFilter(self.filterUserContributor)
+        panelScrollLayout.addWidget(self.filterUserContributor)
+        line = QHLine(self)
+        panelScrollLayout.addWidget(line)
+
+        panelScrollWidget.setLayout(panelScrollLayout)
+        panelScrollArea.setWidget(panelScrollWidget)
+        self.layout.addWidget(panelScrollArea)
+
+        # Connect browser list to filters
+        self.filterUserCreated.boxStateChanged.connect(self.emitDirtyFilter)
+        self.filterUserContributor.boxStateChanged.connect(self.emitDirtyFilter)
+        self.filterTagInclude.boxStateChanged.connect(self.emitDirtyFilter)
+        self.filterTagExclude.boxStateChanged.connect(self.emitDirtyFilter)
+
+
+    def emitDirtyFilter(self):
+        self.dirtyFilter.emit()
+
 
 class SHPMFilterListModel(QtCore.QAbstractListModel):
     def __init__(self, filterTypes, parent=None):
@@ -1088,7 +1243,7 @@ class SHPMProjectBrowserList(QtWidgets.QFrame):
         super(SHPMProjectBrowserList, self).__init__(parent=parent)
         self.layout = QtWidgets.QHBoxLayout()
         allProjects = controller.getAllProjects()
-        self.listModel = SHPMProjectBrowserListModel(allProjects, self)
+        self.listModel = SHPMProjectBrowserListProxyModel(allProjects, self)
         self.listDelegate = SHPMProjectBrowserDelegate(self)
         self.listView = QtWidgets.QListView()
         self.listView.setVerticalScrollMode(
@@ -1099,6 +1254,12 @@ class SHPMProjectBrowserList(QtWidgets.QFrame):
 
         self.setLayout(self.layout)
         self.setFrameShape(QtWidgets.QFrame.StyledPanel)
+
+    def filterList(self):
+        self.listModel.handleFilterChange()
+
+    def registerFilter(self, filterObject):
+        self.listModel.registerFilter(filterObject)
 
 
 class SHPMProjectBrowserListModel(QtCore.QAbstractListModel):
@@ -1114,6 +1275,58 @@ class SHPMProjectBrowserListModel(QtCore.QAbstractListModel):
             return QtCore.QVariant(self.listData[index.row()])
         else:
             return QtCore.QVariant()
+
+
+class SHPMProjectBrowserListProxyModel(QtCore.QSortFilterProxyModel):
+    def  __init__(self, listData, parent=None):
+        super(SHPMProjectBrowserListProxyModel, self).__init__(parent=parent)
+        self._registeredFilters = []
+        self.setSourceModel(SHPMProjectBrowserListModel(listData))
+
+    def filterAcceptsRow(self, sourceRow, sourceParent):
+        idx = self.sourceModel().index(sourceRow, 0, sourceParent).row()
+        itemData = self.sourceModel().listData[idx]
+        #if "jisun" in itemData.get('USER_CONTRIBUTORS', []):
+        #    return False
+        for filterObject in self._registeredFilters:
+            species, filterData = filterObject.getFilterData()
+            # TAGS
+            if species == "tag":
+                pTags = controller.getTagsFromProject(itemData)
+                iTags = filterData.get("include", [])
+                eTags = filterData.get("exclude", [])
+                if iTags and not any([x for x in iTags if x in pTags]):
+                    return False
+                if eTags and any([x for x in eTags if x in pTags]):
+                    return False
+            # CREATOR
+            if species == "userCreator":
+                pCreator = controller.getUserCreatedFromProject(
+                    itemData,
+                    icon=False)
+                if filterData and not pCreator in filterData:
+                    return False
+            # CONTRIBUTORS
+            if species == "userContributor":
+                pContributors = controller.getContributorsFromProject(
+                    itemData,
+                    icons=False)
+                if filterData and not any(
+                        [x for x in filterData if x in pContributors]):
+                    return False
+
+        return True
+
+    def handleFilterChange(self):
+        # This calls filterAcceptsRow:
+        self.invalidateFilter()
+
+    def registerFilter(self, filterObject):
+        if not hasattr(filterObject, "getFilterData"):
+            msg = "Filter object {} lacks required method 'getFilterData'"
+            msg = msg.filter(filterObject)
+            raise ValueError(msg)
+        self._registeredFilters.append(filterObject)
 
 
 class SHPMProjectInspector(QtWidgets.QFrame):
