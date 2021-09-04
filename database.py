@@ -4,6 +4,12 @@ import sqlite3
 import collections
 import datetime
 
+
+def getImageForUser(userName):
+    pMan = ProjDBManager()
+    return pMan.getImageForUser(userName)
+
+
 class ProjDBManager(object):
     def __init__(self):
         self.dbPath = os.environ['HOME']+".stetsonProjMngr.db"
@@ -32,6 +38,17 @@ class ProjDBManager(object):
         conn.commit()
         conn.close()
 
+    def getImageForUser(self, userName):
+        conn = sqlite3.connect(self.dbPath)
+        with conn.cursor() as cursor:
+            conn.execute("SELECT icon FROM users WHERE username = '%s'",
+                        (username, ))
+            result = cursor.fetchone()
+        if result is None:
+            return False
+        userImage, = result
+        return userImage
+
     def getRecords(self):
         conn = sqlite3.connect(self.dbPath)
         cursor = conn.execute("SELECT * FROM projects")
@@ -51,6 +68,7 @@ class StetsonProj(collections.OrderedDict):
         self['DESCRIPTION'] = ""
         self['DIRECTORY_NAS'] = ""
         self['DIRECTORIES_LOCAL'] = ""
+        self['DISK_USAGE'] = None
         self['FILE_TYPES'] = []
         self['GIT_ENABLED'] = False
         self['GIT_ROOT'] = ""
@@ -59,6 +77,7 @@ class StetsonProj(collections.OrderedDict):
         self['IS_ARCHIVED'] = False
         self['LAST_SYNC_DATE'] = datetime.datetime.now() - datetime.timedelta(365) # Init with dummy value
         self['LAST_SYNC_HOST'] = ""
+        self['LINKS'] = {}
         self['NOTES'] = {}
         self['OWNER'] = None
         self['PROJECT_CATEGORY'] = None

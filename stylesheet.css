@@ -1,0 +1,93 @@
+QMainWindow,
+QWidget {
+    background-color: #f9fbfc;
+    border: 0;
+    font-family: Roboto, sans-serif;
+    color: #021124;
+}
+
+SHPMTopBar,
+SHPMProjectBrowserFilter,
+SHPMProjectBrowserFilter QWidget{
+    background-color: #e6f0f8;
+}
+
+QLabel#textLight {
+    color: #a5aebb;
+}
+
+ClickableLabel {
+    color: #0000FF;
+    text-decoration: none;
+    font-size: 12px;
+}
+
+QLabel#filterTitle {
+    font-size: 12px;
+    font-weight: bold;
+}
+
+ComboBoxCompleter:editable,
+ComboBoxCompleter {
+    border: 1px solid #d1dceb;
+    background-color: #FFFFFF;
+}
+
+
+QListView,
+ComboBoxCompleter {
+    color: #7d8a9e;
+}
+
+QAbstractItemView{
+    background: #FFFFFF;
+    background-color: #FFFFFF;
+}
+
+ComboBoxCompleter QAbstractItemView {
+    background: #ffffff;
+    selection-color: #a5aebb;
+    selection-background-color: #0f4a7a;
+}
+QCheckBox::indicator {
+    background-color: #f9fbfc;
+    color: #333333;
+    border: 1px solid #d1dceb;
+    border-radius: 2px;
+    width: 13px;
+    height: 13px;
+}
+QCheckBox::indicator:checked {
+    background-color: #0f4a7a;
+    border: 1px solid #0f4a7a;
+    image: url('./icons/check.png');
+}
+QCheckBox::disabled {
+    color: #a5aebb;
+}
+
+QScrollBar::handle {
+    background: #f3f6f9;
+    border: 1px solid #d1dceb;
+    border-radius: 7px;
+    min-width: 15px;
+}
+QScrollBar::handle::hover {
+    background: #b6c3d4;
+}
+QScrollBar::handle::pressed {
+    background: #848e9c;
+}
+QScrollBar::sub-line:vertical {
+    background: #d1dceb;
+    border: 0px solid #d1dceb;
+}
+QScrollBar::sub-page:vertical.
+QScrollBar::add-page:vertical {
+    background: none;
+}
+QScrollBar::sub-page:vertical.
+QScrollBar::add-page:vertical {
+    background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
+    stop: 0 #0000FF, stop: 0.5 #00FF00, stop:1 #FF0000);
+}

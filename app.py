@@ -1,5 +1,6 @@
 
 # std imports
+import datetime
 import os
 import sys
 
@@ -16,6 +17,101 @@ TAG_COLORS = {
     "green":  ((0, 227, 101), (0, 0, 0)),
     "grey":   ((238, 238, 238), (0, 0, 0)),
 }
+
+#################
+# Decorators
+#################
+def styledQt(cls):
+    init = cls.__init__
+    def __init__(self, *args, **kwargs):
+        init(self, *args, **kwargs)
+        with open("./stylesheet.css") as fh:
+            self.setStyleSheet(fh.read())
+    cls.__init__ = __init__
+    return cls
+
+
+#################
+# Classes
+#################
+class ClickableLabel(QtWidgets.QLabel):
+    clicked = QtCore.pyqtSignal()
+    def __init__(self, labelText, color=None, parent=None):
+        super(ClickableLabel, self).__init__(parent=parent)
+        self.labelText = labelText
+        self._build()
+
+    def _build(self):
+        self.setText(self.labelText)
+        self.installEventFilter(self)
+
+    def eventFilter(self, obj, event):
+        if event.type() == QtCore.QEvent.Enter:
+            styleSheetText = ("text-decoration: underline;")
+            self.setStyleSheet(styleSheetText)
+        elif event.type() == QtCore.QEvent.Leave:
+            styleSheetText = ("text-decoration: none;")
+            self.setStyleSheet(styleSheetText)
+        return False
+
+    def mousePressEvent(self, event):
+        super(ClickableLabel, self).mousePressEvent(event)
+        self.clicked.emit()
+
+
+class ComboBoxCompleter(QtWidgets.QComboBox):
+    textEditFinished = QtCore.pyqtSignal()
+    def __init__(self, parent=None):
+        super(ComboBoxCompleter, self).__init__(parent=parent)
+        self.setEditable(True)
+        self.completer = QtWidgets.QCompleter(self)
+        self.completer.setCompletionMode(
+            QtWidgets.QCompleter.UnfilteredPopupCompletion)
+        self.completer.setPopup(self.view())
+        self.completer.popup().setObjectName("ComboBoxCompleterList")
+        self.filterProxyModel = QtCore.QSortFilterProxyModel(self)
+        self.filterProxyModel.setFilterCaseSensitivity(QtCore.Qt.CaseInsensitive)
+        self.model = QtGui.QStandardItemModel()
+
+        self.setCompleter(self.completer)
+        self.setModel(self.model)
+        self.setFocusPolicy = QtCore.Qt.StrongFocus
+
+        self.lineEdit().textEdited.connect(
+            self.filterProxyModel.setFilterFixedString)
+        self.lineEdit().returnPressed.connect(self._handleTextEditFinished)
+        self.completer.activated.connect(self.setTextIfCompleterIsClicked)
+        self.currentIndexChanged.connect(self._handleTextEditFinished)
+
+    def _handleTextEditFinished(self):
+        self.textEditFinished.emit()
+
+    def addItems(self, items):
+        for i, word in enumerate(items):
+            item = QtGui.QStandardItem(word)
+            self.model.setItem(i, 0, item)
+        self.setModelColumn(0)
+
+    def setModel(self, model):
+        super(ComboBoxCompleter, self).setModel(model)
+        self.filterProxyModel.setSourceModel(model)
+        self.completer.setModel(self.filterProxyModel)
+
+    def setModelColumn(self, column):
+        self.completer.setCompletionColumn(column)
+        self.filterProxyModel.setFilterKeyColumn(column)
+        super(ComboBoxCompleter, self).setModelColumn(column)
+
+    def view(self):
+        return self.completer.popup()
+
+    def index(self):
+        return self.currentIndex()
+
+    def setTextIfCompleterIsClicked(self, text):
+        if text:
+            index = self.findText(text)
+            self.setCurrentIndex(index)
 
 
 class ImagePushButton(QtWidgets.QPushButton):
@@ -169,10 +265,290 @@ class ImagePushButton(QtWidgets.QPushButton):
         self.update()
 
 
+class TimeSpinBox(QtWidgets.QSpinBox):
+    def textFromValue(self, num):
+        return str(num).rjust(2, "0")
+
+
+class TimePicker(QtWidgets.QFrame):
+    def __init__(self, parent=None):
+        super(TimePicker, self).__init__(parent=parent)
+        startSpacer = QtWidgets.QSpacerItem(
+            1,
+            3,
+            QtWidgets.QSizePolicy.MinimumExpanding)
+        self.layout = QtWidgets.QHBoxLayout()
+        self.hourBox = TimeSpinBox(self)
+        self.hourBox.setRange(1, 12)
+        self.minBox = TimeSpinBox(self)
+        self.minBox.setRange(0, 59)
+        self.ampm = QtWidgets.QComboBox(self)
+        self.ampm.addItems(["AM", "PM"])
+        endSpacer = QtWidgets.QSpacerItem(
+            1,
+            3,
+            QtWidgets.QSizePolicy.MinimumExpanding)
+        self.layout.addItem(startSpacer)
+        self.layout.addWidget(self.hourBox)
+        self.layout.addWidget(self.minBox)
+        self.layout.addWidget(self.ampm)
+        self.layout.addItem(endSpacer)
+        self.setLayout(self.layout)
+
+class DatePopup(QtWidgets.QDateTimeEdit):
+    def __init__(self, before=True, *args, **kwargs):
+        super(DatePopup, self).__init__(*args, **kwargs, calendarPopup=True)
+        self.todayButton = QtWidgets.QPushButton(self.tr("Today"))
+        self.todayButton.clicked.connect(self.updateToday)
+        self.calendarWidget().layout().addWidget(self.todayButton)
+        self.addTime()
+        self.calendarWidget().setMinimumHeight(250)
+        if before:
+            self.setDateTime(QtCore.QDateTime.currentDateTime())
+        else:
+            past = datetime.datetime(2000, 1, 1)
+            self.setDateTime(QtCore.QDateTime(past))
+        self.dateChanged.connect(self._setTime)
+
+    def _setTime(self):
+        hour = self.timePicker.hourBox.value()
+        minute = self.timePicker.minBox.value()
+        ampm = self.timePicker.ampm.currentText()
+        if ampm == "PM":
+            hour = hour + 12
+            if hour == 24:
+                hour = 12
+        time = QtCore.QTime(hour, minute)
+        self.setTime(time)
+
+    def addTime(self):
+        self.timePicker = TimePicker(parent=self)
+        self.calendarWidget().layout().addWidget(self.timePicker)
+
+    def updateToday(self):
+        self.todayButton.clearFocus()
+        today = QtCore.QDate.currentDate()
+        self.calendarWidget().setSelectedDate(today)
+
+
+class FilterDateTime(QtWidgets.QFrame):
+    def __init__(self, dateType=None, *args, **kwargs):
+        super(FilterDateTime, self).__init__(*args, **kwargs)
+        self.dateType = dateType or "modified"
+        self.layout = QtWidgets.QVBoxLayout()
+        self._buildLayout()
+        self.setLayout(self.layout)
+        self.species = "dateTime"
+
+    def _buildLayout(self):
+        if self.dateType == "modified":
+            title = QtWidgets.QLabel("LAST MODIFIED")
+        else:
+            title = QtWidgets.QLabel("CREATED")
+        title.setObjectName("filterTitle")
+        self.layout.addWidget(title)
+
+        beforeRow = QtWidgets.QHBoxLayout()
+        before = QtWidgets.QLabel("before")
+        #before.setObjectName("filterTitle")
+        beforeRow.addWidget(before)
+
+        self.datePopupBefore = DatePopup(before=True, parent=self)
+        beforeRow.addWidget(self.datePopupBefore)
+        self.layout.addLayout(beforeRow)
+
+        afterRow = QtWidgets.QHBoxLayout()
+        after = QtWidgets.QLabel("after")
+        #after.setObjectName("filterTitle")
+        afterRow.addWidget(after)
+
+        self.datePopupAfter = DatePopup(before=False, parent=self)
+        afterRow.addWidget(self.datePopupAfter)
+        self.layout.addLayout(afterRow)
+
+    def getFilterData(self):
+        species = self.species + self.dateType.title()
+        data = {
+            "before": self.datePopupBefore.dateTime(),
+            "after": self.datePopupAfter.dateTime()
+        }
+        return (species, data)
+
+
+@styledQt
+class FilterTagNewStyle(QtWidgets.QFrame):
+    boxStateChanged = QtCore.pyqtSignal(object, int)
+    def __init__(self, include=True, parent=None):
+        super(FilterTagNewStyle, self).__init__(parent=parent)
+        self.include = include
+        self.layout = QtWidgets.QVBoxLayout()
+        self._buildLayout()
+        self.setLayout(self.layout)
+        self.setMaximumHeight(200)
+        self.species = "tag"
+
+    def _buildLayout(self):
+        # Include Tags line
+        inclTagsLineLayout = QtWidgets.QHBoxLayout()
+        inclTagsLineLayout.setContentsMargins(0, 0, 0, 0)
+        if self.include:
+            title = QtWidgets.QLabel("INCLUDE TAGS (")
+        else:
+            title = QtWidgets.QLabel("EXCLUDE TAGS (")
+        title.setObjectName("filterTitle")
+        inclTagsLineLayout.addWidget(title)
+        self.btnClearFilter = ClickableLabel("Clear")
+        self.btnClearFilter.clicked.connect(self.clearTags)
+        inclTagsLineLayout.addWidget(self.btnClearFilter)
+        endParen = QtWidgets.QLabel(")")
+        endParen.setObjectName("filterTitle")
+        inclTagsLineLayout.addWidget(endParen)
+        spacer = QtWidgets.QSpacerItem(
+            10,
+            1,
+            QtWidgets.QSizePolicy.Expanding)
+        inclTagsLineLayout.addItem(spacer)
+        self.layout.addLayout(inclTagsLineLayout)
+
+        # Combo Box
+        self.cbCompleterTag = ComboBoxCompleter(self)
+        self.cbCompleterTag.textEditFinished.connect(self._toggleCheckBox)
+        self.layout.addWidget(self.cbCompleterTag)
+        self.cbCompleterTag.addItems(controller.getAllTags())
+
+        # Scroll Area with List
+        scrollAreaList = QtWidgets.QScrollArea()
+        itemList = QtWidgets.QWidget()
+        self.itemListLayout = QtWidgets.QVBoxLayout()
+        itemList.setLayout(self.itemListLayout)
+        for item in controller.getAllTags():
+            chkbx = QtWidgets.QCheckBox(item.title(), self)
+            chkbx.stateChanged.connect(self._handleStateChange)
+            self.itemListLayout.addWidget(chkbx)
+        self.layout.addWidget(scrollAreaList)
+        scrollAreaList.setWidget(itemList)
+
+    def _handleStateChange(self, state):
+        sender = self.sender()
+        self.boxStateChanged.emit(sender, state)
+
+    def _toggleCheckBox(self):
+        tagName = self.cbCompleterTag.currentText()
+        index = self.itemListLayout.count()
+        while index >= 0:
+            item = self.itemListLayout.itemAt(index)
+            if not item:
+                index -= 1
+                continue
+            itemName = item.widget().text().lower()
+            if itemName == tagName:
+                if item.widget().isChecked():
+                    item.widget().setChecked(False)
+                else:
+                    item.widget().setChecked(True)
+                break
+            index -= 1
+
+    def clearTags(self):
+        index = self.itemListLayout.count()
+        while index >= 0:
+            item = self.itemListLayout.itemAt(index)
+            if not item:
+                index -= 1
+                continue
+            item.widget().setChecked(False)
+            index -= 1
+
+    def getFilterData(self):
+        checkedTags = []
+        index = self.itemListLayout.count()
+        while index >= 0:
+            item = self.itemListLayout.itemAt(index)
+            if not item:
+                index -= 1
+                continue
+            if item.widget().isChecked():
+                tagName = item.widget().text().lower()
+                checkedTags.append(tagName)
+            index -= 1
+
+        species = self.species
+        if self.include:
+            keyword = "include"
+        else:
+            keyword = "exclude"
+        data = {keyword: checkedTags}
+        return (species, data)
+
+    def reactToStateChange(self, sender, state):
+        tagName = sender.text()
+
+        index = self.itemListLayout.count()
+        while index >= 0:
+            item = self.itemListLayout.itemAt(index)
+            if not item:
+                index -= 1
+                continue
+            if item.widget().text() == tagName:
+                item.widget().setEnabled(not state)
+                break
+            index -= 1
+
 
 class FilterTag(QtWidgets.QFrame):
     def __init__(self, parent=None):
         super(FilterTag, self).__init__(parent=parent)
+        self.layout = QtWidgets.QVBoxLayout()
+        self._searchType = "with tag"
+        self._tagName = "home"
+        self._title = "Tag"
+        self.phrase = "default label message"
+
+        self._buildLayout()
+        self.setLayout(self.layout)
+
+    def _buildLayout(self):
+        self.titleLabel = QtWidgets.QLabel(self._title)
+        self.layout.addWidget(self.titleLabel)
+        self.phraseLabel = QtWidgets.QLabel()
+        self.setPhrase()
+        self.layout.addWidget(self.phraseLabel)
+
+    def setPhrase(self):
+        self.phrase = "{}: \"{}\"".format(self._searchType, self._tagName)
+        self.phraseLabel.setText(self.phrase)
+
+    @property
+    def searchType(self):
+        return self._searchType
+
+    @searchType.setter
+    def searchType(self, searchType):
+        self._searchType = searchType
+        self.setPhrase()
+
+    @property
+    def tagName(self):
+        return self._tagName
+
+    @tagName.setter
+    def tagName(self, newtag):
+        self._tagName = newtag
+        self.setPhrase()
+
+    @property
+    def title(self):
+        return self._title
+
+    @title.setter
+    def title(self, title):
+        self._title = title
+        self.titleLabel.setText(self._title)
+
+
+class FilterTagEditor(QtWidgets.QFrame):
+    def __init__(self, parent=None):
+        super(FilterTagEditor, self).__init__(parent=parent)
         self.layout = QtWidgets.QVBoxLayout()
         self._buildLayout()
         self.setLayout(self.layout)
@@ -210,6 +586,79 @@ class FilterTag(QtWidgets.QFrame):
         actionButtonsLayout.addWidget(self.btnDelete)
         self.layout.addLayout(actionButtonsLayout)
 
+    @property
+    def action(self):
+        return self.cbAction.currentText()
+
+    @action.setter
+    def action(self, newAction):
+        self.cbAction.setCurrentText(newAction)
+
+    @property
+    def tagName(self):
+        return self.cbTags.currentText()
+
+    @tagName.setter
+    def tagName(self, newTag):
+        self.cbTags.setCurrentText(newTag)
+
+
+@styledQt
+class FilterUser(QtWidgets.QFrame):
+    boxStateChanged = QtCore.pyqtSignal(object, int)
+    def __init__(self, mode=None, parent=None):
+        super(FilterUser, self).__init__(parent=parent)
+        self.mode = mode or "creator"
+        self.layout = QtWidgets.QVBoxLayout()
+        self._buildLayout()
+        self.setLayout(self.layout)
+        self.setMaximumHeight(200)
+        self.species = "user"
+
+    def _buildLayout(self):
+        # Title
+        title = QtWidgets.QLabel("{}".format(self.mode.upper()))
+        title.setObjectName("filterTitle")
+        self.layout.addWidget(title)
+
+        # Scroll Area with List
+        scrollAreaList = QtWidgets.QScrollArea()
+        itemList = QtWidgets.QWidget()
+        self.itemListLayout = QtWidgets.QVBoxLayout()
+        itemList.setLayout(self.itemListLayout)
+        if self.mode == "creator":
+            users = controller.getAllUsersCreated()
+        else:
+            users = controller.getAllUsersModified()
+        for user in users:
+            chkbx = QtWidgets.QCheckBox(user, self)
+            chkbx.setIcon(controller.getIconForUser(user))
+            chkbx.stateChanged.connect(self._handleStateChange)
+            self.itemListLayout.addWidget(chkbx)
+        self.layout.addWidget(scrollAreaList)
+        scrollAreaList.setWidget(itemList)
+
+    def _handleStateChange(self, state):
+        sender = self.sender()
+        self.boxStateChanged.emit(sender, state)
+
+    def getFilterData(self):
+        species = self.species + self.mode.title()
+        return (species, self.getSelectedUsers())
+
+    def getSelectedUsers(self):
+        users = []
+        index = self.itemListLayout.count()
+        while index >= 0:
+            item = self.itemListLayout.itemAt(index)
+            if not item:
+                index -= 1
+                continue
+            if item.widget().isChecked() and item.widget().isEnabled():
+                users.append(item.widget().text())
+            index -= 1
+        return sorted(users)
+
 
 class StetsonHPMMainWindow(QtWidgets.QMainWindow):
     """Main window for Stetson HPM, containing the main widget.
@@ -227,6 +676,7 @@ class StetsonHPMMainWindow(QtWidgets.QMainWindow):
         self.setCentralWidget(StetsonHPMMainWidget(self))
 
 
+@styledQt
 class StetsonHPMMainWidget(QtWidgets.QFrame):
     """Main widget for Stetson HPM.
 
@@ -263,12 +713,12 @@ class SHPMTopBar(QtWidgets.QFrame):
         self.layout.addItem(spacer)
 
         self.profilePicture = QtWidgets.QLabel()
-        pixmap = QtGui.QPixmap("icons/allen.png")
+        pixmap = QtGui.QPixmap("samples/allen.png")
         self.profilePicture.setPixmap(
             pixmap.scaledToHeight(50)
             )
+        self.profilePicture.setAttribute(QtCore.Qt.WA_TranslucentBackground)
         self.layout.addWidget(self.profilePicture)
-        self.setStyleSheet("background: #CCCCCC;")
         self.setLayout(self.layout)
 
 
@@ -282,33 +732,186 @@ class SHPMWindowStack(QtWidgets.QStackedWidget):
 
 
 class SHPMProjectBrowser(QtWidgets.QFrame):
+    projectBrowserFilterChanged = QtCore.pyqtSignal()
     def  __init__(self, parent=None):
         super(SHPMProjectBrowser, self).__init__(parent=parent)
+        self.filters = []
         self.layout = QtWidgets.QHBoxLayout()
+        self.projectList = SHPMProjectBrowserList(parent=self)
+        self.projectFilter = SHPMProjectBrowserFilter(parent=self)
         self.browserSplitter = QtWidgets.QSplitter(QtCore.Qt.Horizontal)
-        self.browserSplitter.addWidget(SHPMProjectBrowserFilter(parent=self))
-        self.browserSplitter.addWidget(SHPMProjectBrowserList(parent=self))
+        self.browserSplitter.addWidget(self.projectFilter)
+        self.browserSplitter.addWidget(self.projectList)
+        # Connect filter to list
+        self.projectFilter.dirtyFilter.connect(self.projectList.filterList)
         self.layout.addWidget(self.browserSplitter)
         self.setLayout(self.layout)
 
+    def registerFilter(self, filterObject):
+        self.projectList.registerFilter(filterObject)
 
+
+@styledQt
 class SHPMProjectBrowserFilter(QtWidgets.QFrame):
+    dirtyFilter = QtCore.pyqtSignal()
     def  __init__(self, parent=None, *args, **kwargs):
         super(SHPMProjectBrowserFilter, self).__init__(parent=parent, *args, **kwargs)
         self.layout = QtWidgets.QVBoxLayout()
         self._buildLayout()
         self.setLayout(self.layout)
-        self.setMaximumWidth(200)
+        self.setMaximumWidth(250)
         self.setFrameShape(QtWidgets.QFrame.StyledPanel)
 
     def _buildLayout(self):
-        self.layout.addWidget(FilterTag())
-        spacer = QtWidgets.QSpacerItem(
-            10,
-            700,
-            QtWidgets.QSizePolicy.Expanding
+        panelScrollArea = QtWidgets.QScrollArea()
+        panelScrollWidget = QtWidgets.QWidget()
+        panelScrollWidget.setMinimumHeight(1000)
+        panelScrollLayout = QtWidgets.QVBoxLayout()
+
+        self.filterTagInclude = FilterTagNewStyle()
+        controller.registerProjectBrowserFilter(self.filterTagInclude)
+        panelScrollLayout.addWidget(self.filterTagInclude)
+        line = QHLine(self)
+        panelScrollLayout.addWidget(line)
+
+        self.filterTagExclude = FilterTagNewStyle(include=False)
+        controller.registerProjectBrowserFilter(self.filterTagExclude)
+        panelScrollLayout.addWidget(self.filterTagExclude)
+        line = QHLine(self)
+        panelScrollLayout.addWidget(line)
+
+        # Connect mutually exclusive widgets
+        self.filterTagInclude.boxStateChanged.connect(
+                self.filterTagExclude.reactToStateChange)
+        self.filterTagExclude.boxStateChanged.connect(
+                self.filterTagInclude.reactToStateChange)
+
+        self.filterDateTimeModified = FilterDateTime(dateType="modified")
+        controller.registerProjectBrowserFilter(self.filterDateTimeModified)
+        panelScrollLayout.addWidget(self.filterDateTimeModified)
+        line = QHLine(self)
+        panelScrollLayout.addWidget(line)
+
+        self.filterDateTimeCreated = FilterDateTime(dateType="created")
+        controller.registerProjectBrowserFilter(self.filterDateTimeCreated)
+        panelScrollLayout.addWidget(self.filterDateTimeCreated)
+        line = QHLine(self)
+        panelScrollLayout.addWidget(line)
+
+        self.filterUserCreated = FilterUser(mode="creator")
+        controller.registerProjectBrowserFilter(self.filterUserCreated)
+        panelScrollLayout.addWidget(self.filterUserCreated)
+        line = QHLine(self)
+        panelScrollLayout.addWidget(line)
+
+        self.filterUserContributor = FilterUser(mode="contributor")
+        controller.registerProjectBrowserFilter(self.filterUserContributor)
+        panelScrollLayout.addWidget(self.filterUserContributor)
+        line = QHLine(self)
+        panelScrollLayout.addWidget(line)
+
+        panelScrollWidget.setLayout(panelScrollLayout)
+        panelScrollArea.setWidget(panelScrollWidget)
+        self.layout.addWidget(panelScrollArea)
+
+        # Connect browser list to filters
+        self.filterUserCreated.boxStateChanged.connect(self.emitDirtyFilter)
+        self.filterUserContributor.boxStateChanged.connect(self.emitDirtyFilter)
+        self.filterTagInclude.boxStateChanged.connect(self.emitDirtyFilter)
+        self.filterTagExclude.boxStateChanged.connect(self.emitDirtyFilter)
+
+
+    def emitDirtyFilter(self):
+        self.dirtyFilter.emit()
+
+
+class SHPMFilterListModel(QtCore.QAbstractListModel):
+    def __init__(self, filterTypes, parent=None):
+        super(SHPMFilterListModel, self).__init__(parent=parent)
+        self.filterTypes = filterTypes
+
+    def data(self, index, role):
+        if index.isValid() and role == QtCore.Qt.DisplayRole:
+            return QtCore.QVariant(self.filterTypes[index.row()])
+        else:
+            return QtCore.QVariant()
+
+    def flags(self, index):
+        return QtCore.Qt.ItemIsEditable | QtCore.Qt.ItemIsEnabled | QtCore.Qt.ItemIsSelectable
+
+    def rowCount(self, parent=QtCore.QModelIndex()):
+        return len(self.filterTypes)
+
+
+class SHPMFilterDelegate(QtWidgets.QItemDelegate):
+    def _handleCloseEditor(self, editor):
+        self.commitData.emit(editor)
+        self.closeEditor.emit(editor)
+
+    def createEditor(self, parent, option, index):
+        filterType = index.data(QtCore.Qt.DisplayRole)
+        if isinstance(filterType, FilterTag):
+            filterEditor = FilterTagEditor(parent=parent)
+            filterEditor.btnDuplicate.clicked.connect(
+                lambda: self._handleCloseEditor(filterEditor)
             )
-        self.layout.addItem(spacer)
+            return filterEditor
+
+    def paint(self, painter, option, index):
+        painter.save()
+        painter.setRenderHint(QtGui.QPainter.Antialiasing)
+
+        backgroundColorSelected = QtGui.QColor(230, 240, 248)
+
+        # item background
+        painter.setPen(QtGui.QPen(QtCore.Qt.NoPen))
+        if option.state & QtWidgets.QStyle.State_Selected:
+            painter.setBrush(QtGui.QBrush(backgroundColorSelected))
+        else:
+            painter.setBrush(QtGui.QBrush(QtCore.Qt.white))
+        painter.drawRect(option.rect)
+
+        # item
+        item = index.data(QtCore.Qt.DisplayRole)
+        if not item:
+            return
+        fontMed10 = QtGui.QFont("Roboto", 10, QtGui.QFont.Medium)
+        fontBold14 = QtGui.QFont("Roboto", 14, QtGui.QFont.Bold)
+        framePadding = 10
+
+        coords = list(option.rect.getCoords())
+        coords[0] += framePadding
+        coords[1] += framePadding
+        painter.setPen(QtGui.QPen(QtCore.Qt.black))
+        painter.setFont(fontBold14)
+        painter.drawText(QtCore.QRect(*coords), QtCore.Qt.AlignLeft, item.title)
+
+        coords[1] += 30
+        painter.setPen(QtGui.QPen(QtCore.Qt.black))
+        painter.setFont(fontMed10)
+        painter.drawText(QtCore.QRect(*coords), QtCore.Qt.AlignLeft, item.phrase)
+
+        painter.restore()
+
+    def setEditorData(self, editor, index):
+        editor.blockSignals(True)
+        item = index.data(QtCore.Qt.DisplayRole)
+        editor.action = item.searchType
+        editor.tagName = item.tagName
+        editor.blockSignals(False)
+
+    def setModelData(self, editor, model, index):
+        if isinstance(index.data(), FilterTag):
+            newWord = "Allen"  # really, get this from the editor
+            index.data().searchType = editor.action
+            index.data().tagName = editor.tagName
+            model.setData(index, index.data())
+        else:
+            super(SHPMFilterDelegate, self).setModelData(editor, model, index)
+
+    def sizeHint(self, option, index):
+        size = QtCore.QSize(100, 100)
+        return size
 
 
 class SHPMProjectBrowserDelegate(QtWidgets.QItemDelegate):
@@ -318,8 +921,7 @@ class SHPMProjectBrowserDelegate(QtWidgets.QItemDelegate):
         painter.save()
         painter.setRenderHint(QtGui.QPainter.HighQualityAntialiasing)
 
-        #backgroundColorSelected = QtCore.Qt.lightGray
-        backgroundColorSelected = QtGui.QColor(232, 235, 250)
+        backgroundColorSelected = QtGui.QColor(230, 240, 248)
 
         # item background
         painter.setPen(QtGui.QPen(QtCore.Qt.NoPen))
@@ -340,13 +942,9 @@ class SHPMProjectBrowserDelegate(QtWidgets.QItemDelegate):
         # Common Fonts
         font10 = QtGui.QFont("Roboto", 10, QtGui.QFont.Normal)
         fontMed10 = QtGui.QFont("Roboto", 10, QtGui.QFont.Medium)
-        fontMed9 = QtGui.QFont("Arial", 9, QtGui.QFont.Medium)
         fontMed20 = QtGui.QFont("Roboto", 20, QtGui.QFont.Medium)
         fontBold10 = QtGui.QFont("Roboto", 10, QtGui.QFont.Bold)
-        fontBold14 = QtGui.QFont("Arial", 14, QtGui.QFont.Bold)
-        fontBold20 = QtGui.QFont("Arial", 20, QtGui.QFont.Bold)
         fontBold25 = QtGui.QFont("Roboto", 25, QtGui.QFont.Bold)
-        fontBold30 = QtGui.QFont("Arial", 30, QtGui.QFont.Bold)
 
         # ---------- utility for tagging --------
         def paintTag(tag, color, coords):
@@ -381,8 +979,8 @@ class SHPMProjectBrowserDelegate(QtWidgets.QItemDelegate):
             shadowRect.topRight(),
             shadowRect.bottomRight()
         )
-        grad.setColorAt(0, QtGui.QColor(255, 255, 255))
-        grad.setColorAt(1, QtGui.QColor(235, 235, 235))
+        grad.setColorAt(0, QtGui.QColor(246, 248, 250))
+        grad.setColorAt(1, QtGui.QColor(243, 247, 251))
         painter.fillRect(shadowRect, grad)
 
         # --------- top row ----------
@@ -652,12 +1250,9 @@ class SHPMProjectBrowserDelegate(QtWidgets.QItemDelegate):
             shadowRect.topRight(),
             shadowRect.bottomRight()
         )
-        grad.setColorAt(0, QtGui.QColor(235, 235, 235))
-        grad.setColorAt(1, QtGui.QColor(255, 255, 255))
+        grad.setColorAt(0, QtGui.QColor(243, 247, 251))
+        grad.setColorAt(1, QtGui.QColor(246, 248, 250))
         painter.fillRect(shadowRect, grad)
-
-
-
 
         painter.restore()
 
@@ -671,7 +1266,7 @@ class SHPMProjectBrowserList(QtWidgets.QFrame):
         super(SHPMProjectBrowserList, self).__init__(parent=parent)
         self.layout = QtWidgets.QHBoxLayout()
         allProjects = controller.getAllProjects()
-        self.listModel = SHPMProjectBrowserListModel(allProjects, self)
+        self.listModel = SHPMProjectBrowserListProxyModel(allProjects, self)
         self.listDelegate = SHPMProjectBrowserDelegate(self)
         self.listView = QtWidgets.QListView()
         self.listView.setVerticalScrollMode(
@@ -682,6 +1277,12 @@ class SHPMProjectBrowserList(QtWidgets.QFrame):
 
         self.setLayout(self.layout)
         self.setFrameShape(QtWidgets.QFrame.StyledPanel)
+
+    def filterList(self):
+        self.listModel.handleFilterChange()
+
+    def registerFilter(self, filterObject):
+        self.listModel.registerFilter(filterObject)
 
 
 class SHPMProjectBrowserListModel(QtCore.QAbstractListModel):
@@ -699,6 +1300,58 @@ class SHPMProjectBrowserListModel(QtCore.QAbstractListModel):
             return QtCore.QVariant()
 
 
+class SHPMProjectBrowserListProxyModel(QtCore.QSortFilterProxyModel):
+    def  __init__(self, listData, parent=None):
+        super(SHPMProjectBrowserListProxyModel, self).__init__(parent=parent)
+        self._registeredFilters = []
+        self.setSourceModel(SHPMProjectBrowserListModel(listData))
+
+    def filterAcceptsRow(self, sourceRow, sourceParent):
+        idx = self.sourceModel().index(sourceRow, 0, sourceParent).row()
+        itemData = self.sourceModel().listData[idx]
+        #if "jisun" in itemData.get('USER_CONTRIBUTORS', []):
+        #    return False
+        for filterObject in self._registeredFilters:
+            species, filterData = filterObject.getFilterData()
+            # TAGS
+            if species == "tag":
+                pTags = controller.getTagsFromProject(itemData, extraTags=True)
+                iTags = filterData.get("include", [])
+                eTags = filterData.get("exclude", [])
+                if iTags and not any([x for x in iTags if x in pTags]):
+                    return False
+                if eTags and any([x for x in eTags if x in pTags]):
+                    return False
+            # CREATOR
+            if species == "userCreator":
+                pCreator = controller.getUserCreatedFromProject(
+                    itemData,
+                    icon=False)
+                if filterData and not pCreator in filterData:
+                    return False
+            # CONTRIBUTORS
+            if species == "userContributor":
+                pContributors = controller.getContributorsFromProject(
+                    itemData,
+                    icons=False)
+                if filterData and not any(
+                        [x for x in filterData if x in pContributors]):
+                    return False
+
+        return True
+
+    def handleFilterChange(self):
+        # This calls filterAcceptsRow:
+        self.invalidateFilter()
+
+    def registerFilter(self, filterObject):
+        if not hasattr(filterObject, "getFilterData"):
+            msg = "Filter object {} lacks required method 'getFilterData'"
+            msg = msg.filter(filterObject)
+            raise ValueError(msg)
+        self._registeredFilters.append(filterObject)
+
+
 class SHPMProjectInspector(QtWidgets.QFrame):
     def  __init__(self, parent=None):
         super(SHPMProjectInspector, self).__init__(parent=parent)
@@ -707,6 +1360,15 @@ class SHPMProjectInspector(QtWidgets.QFrame):
         self.layout.addWidget(mylabel)
         self.setLayout(self.layout)
 
+class QHLine(QtWidgets.QFrame):
+    def __init__(self, parent=None):
+        super(QHLine, self).__init__(parent=parent)
+        #self.setFrameShape(QtWidgets.QFrame.HLine)
+        #self.setFrameShadow(QtWidgets.QFrame.Sunken)
+        self.setMinimumHeight(1)
+        self.setMaximumHeight(1)
+        self.setStyleSheet("background: #d1dceb;")
+        self.setObjectName("QHLine")
 
 
 def main():
