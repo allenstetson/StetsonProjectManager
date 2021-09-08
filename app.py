@@ -694,31 +694,51 @@ class StetsonHPMMainWidget(QtWidgets.QFrame):
         self.setLayout(self.mainLayout)
 
     def buildLayout(self):
-        self.topBar = SHPMTopBar()
-        self.mainLayout.addWidget(self.topBar)
-
         windowStack = SHPMWindowStack(self)
         self.mainLayout.addWidget(windowStack)
+
+@styledQt
+class SearchBox(QtWidgets.QLineEdit):
+    def __init__(self, *args, **kwargs):
+        super(SearchBox, self).__init__(*args, **kwargs)
+        self.setPlaceholderText("Search")
+        self.setObjectName("SearchBox")
+
+    def keyPressEvent(self, event):
+        if event.key() == QtCore.Qt.Key_Escape:
+            self.clear()
+        super(SearchBox, self).keyPressEvent(event)
 
 
 class SHPMTopBar(QtWidgets.QFrame):
     def __init__(self, parent=None):
         super(SHPMTopBar, self).__init__(parent=parent)
         self.layout = QtWidgets.QHBoxLayout()
+        # search
+        searchBox = SearchBox(parent=self)
+        searchBox.setMinimumWidth(150)
+        searchBox.setMaximumWidth(150)
+        self.layout.addWidget(searchBox)
+        #space
         spacer = QtWidgets.QSpacerItem(
             400,
             10,
             QtWidgets.QSizePolicy.Expanding
             )
         self.layout.addItem(spacer)
-
+        # user
         self.profilePicture = QtWidgets.QLabel()
         pixmap = QtGui.QPixmap("samples/allen.png")
         self.profilePicture.setPixmap(
-            pixmap.scaledToHeight(50)
+            pixmap.scaledToHeight(40)
             )
         self.profilePicture.setAttribute(QtCore.Qt.WA_TranslucentBackground)
         self.layout.addWidget(self.profilePicture)
+        # button
+        self.btnNewProject = QtWidgets.QPushButton(self)
+        self.btnNewProject.setText("New Project")
+        self.layout.addWidget(self.btnNewProject)
+
         self.setLayout(self.layout)
 
 
@@ -737,18 +757,76 @@ class SHPMProjectBrowser(QtWidgets.QFrame):
         super(SHPMProjectBrowser, self).__init__(parent=parent)
         self.filters = []
         self.layout = QtWidgets.QHBoxLayout()
+
+        # declare list -- must come before filter declaration
         self.projectList = SHPMProjectBrowserList(parent=self)
+        self.projectList.filterUpdateFinished.connect(self.updateNumResults)
+        # Project Filter
         self.projectFilter = SHPMProjectBrowserFilter(parent=self)
+
+        # Project List
+        rightFrame = QtWidgets.QFrame()
+        rightFrameLayout = QtWidgets.QVBoxLayout()
+        rightFrame.setLayout(rightFrameLayout)
+
+        # Top Bar        
+        self.topBar = SHPMTopBar()
+        rightFrameLayout.addWidget(self.topBar)
+
+        # HLine
+        line = QHLine(self)
+        rightFrameLayout.addWidget(line)
+
+        sortLayout = QtWidgets.QHBoxLayout()
+        ## Num Results
+        lblShowing = QtWidgets.QLabel("showing ")
+        lblShowing.setObjectName("textLight")
+        self.lblNumResults = QtWidgets.QLabel("68 results")
+        self.lblNumResults.setObjectName("textBold")
+        sortLayout.addWidget(lblShowing)
+        sortLayout.addWidget(self.lblNumResults)
+        ## spacer
+        spacer = QtWidgets.QSpacerItem(
+            300,
+            10,
+            QtWidgets.QSizePolicy.Expanding)
+        sortLayout.addItem(spacer)
+        ## Sorter
+        sortLabel = QtWidgets.QLabel("Sort by:")
+        sortLabel.setObjectName("textLight")
+        sortLayout.addWidget(sortLabel)
+        self.sortBy = QtWidgets.QComboBox()
+        self.sortBy.setMinimumWidth(80)
+        sortOptions = ["Title ", "Created", "Modified", "Status"]
+        for option in sortOptions:
+            self.sortBy.addItem(option + " (descending)")
+            self.sortBy.addItem(option + " (ascending)")
+
+        self.sortBy.setEditable(True)
+        self.sortBy.lineEdit().setReadOnly(True)
+        self.sortBy.lineEdit().setAlignment(QtCore.Qt.AlignRight)
+        self.sortBy.setObjectName("comboSortBy")
+        sortLayout.addWidget(self.sortBy)
+        ## -
+        rightFrameLayout.addLayout(sortLayout)
+        ##List
+        rightFrameLayout.addWidget(self.projectList)
+        # Splitter
         self.browserSplitter = QtWidgets.QSplitter(QtCore.Qt.Horizontal)
         self.browserSplitter.addWidget(self.projectFilter)
-        self.browserSplitter.addWidget(self.projectList)
+        self.browserSplitter.addWidget(rightFrame)
+        self.layout.addWidget(self.browserSplitter)
         # Connect filter to list
         self.projectFilter.dirtyFilter.connect(self.projectList.filterList)
-        self.layout.addWidget(self.browserSplitter)
         self.setLayout(self.layout)
+        self.updateNumResults()
 
     def registerFilter(self, filterObject):
         self.projectList.registerFilter(filterObject)
+
+    def updateNumResults(self):
+        num = self.projectList.listModel.rowCount()
+        self.lblNumResults.setText("{} results".format(num))
 
 
 @styledQt
@@ -921,15 +999,37 @@ class SHPMProjectBrowserDelegate(QtWidgets.QItemDelegate):
         painter.save()
         painter.setRenderHint(QtGui.QPainter.HighQualityAntialiasing)
 
-        backgroundColorSelected = QtGui.QColor(230, 240, 248)
+        #backgroundColorSelected = QtGui.QColor(230, 240, 248)
+        backgroundColorSelected = QtGui.QColor(15, 74, 122)
 
         # item background
         painter.setPen(QtGui.QPen(QtCore.Qt.NoPen))
-        if option.state & QtWidgets.QStyle.State_Selected:
-            painter.setBrush(QtGui.QBrush(backgroundColorSelected))
-        else:
-            painter.setBrush(QtGui.QBrush(QtCore.Qt.white))
+        painter.setBrush(QtGui.QBrush(QtCore.Qt.white))
         painter.drawRect(option.rect)
+        # SELECTION BOX
+        painter.setPen(QtGui.QPen(QtCore.Qt.NoPen))
+        if option.state & QtWidgets.QStyle.State_Selected:
+            # paint a border
+            ## draw the selection rect
+            coords = list(option.rect.getCoords())
+            coords[1] += 5  # account for shadows
+            height = coords[3] - coords[1]
+            coords[3] -= 15
+            coords[3] = height - 15
+            smoothBox = QtGui.QPainterPath()
+            smoothBox.addRoundedRect(QtCore.QRectF(*coords), 5, 5)
+            painter.setRenderHint(QtGui.QPainter.Antialiasing)
+            painter.fillPath(smoothBox, backgroundColorSelected)
+
+            ## fill the interior with white
+            coords[0] += 3  # border of 3
+            coords[1] += 3
+            coords[2] -= 6
+            coords[3] -= 6
+            smoothBox = QtGui.QPainterPath()
+            smoothBox.addRoundedRect(QtCore.QRectF(*coords), 4, 4)
+            painter.setRenderHint(QtGui.QPainter.Antialiasing)
+            painter.fillPath(smoothBox, QtCore.Qt.white)
 
         # item
         project = index.data(QtCore.Qt.DisplayRole)
@@ -1171,7 +1271,10 @@ class SHPMProjectBrowserDelegate(QtWidgets.QItemDelegate):
                 whiteCircle.closeSubpath()
                 whiteColor = QtGui.QColor(255, 255, 255)
                 if option.state & QtWidgets.QStyle.State_Selected:
-                    painter.fillPath(whiteCircle, backgroundColorSelected)
+                    # if the background color ever changes during selection,
+                    #  uncomment this line and delete the following:
+                    #painter.fillPath(whiteCircle, backgroundColorSelected)
+                    painter.fillPath(whiteCircle, whiteColor)
                 else:
                     painter.fillPath(whiteCircle, whiteColor)
                 coords[0] += 3  # undo offsets
@@ -1262,11 +1365,13 @@ class SHPMProjectBrowserDelegate(QtWidgets.QItemDelegate):
 
 
 class SHPMProjectBrowserList(QtWidgets.QFrame):
+    filterUpdateFinished = QtCore.pyqtSignal()
     def  __init__(self, parent=None):
         super(SHPMProjectBrowserList, self).__init__(parent=parent)
         self.layout = QtWidgets.QHBoxLayout()
         allProjects = controller.getAllProjects()
         self.listModel = SHPMProjectBrowserListProxyModel(allProjects, self)
+        self.listModel.filterUpdateFinished.connect(self._handleFilterFinished)
         self.listDelegate = SHPMProjectBrowserDelegate(self)
         self.listView = QtWidgets.QListView()
         self.listView.setVerticalScrollMode(
@@ -1277,6 +1382,9 @@ class SHPMProjectBrowserList(QtWidgets.QFrame):
 
         self.setLayout(self.layout)
         self.setFrameShape(QtWidgets.QFrame.StyledPanel)
+
+    def _handleFilterFinished(self):
+        self.filterUpdateFinished.emit()
 
     def filterList(self):
         self.listModel.handleFilterChange()
@@ -1301,6 +1409,7 @@ class SHPMProjectBrowserListModel(QtCore.QAbstractListModel):
 
 
 class SHPMProjectBrowserListProxyModel(QtCore.QSortFilterProxyModel):
+    filterUpdateFinished = QtCore.pyqtSignal()
     def  __init__(self, listData, parent=None):
         super(SHPMProjectBrowserListProxyModel, self).__init__(parent=parent)
         self._registeredFilters = []
@@ -1335,12 +1444,12 @@ class SHPMProjectBrowserListProxyModel(QtCore.QSortFilterProxyModel):
                 if filterData and not any(
                         [x for x in filterData if x in pContributors]):
                     return False
-
         return True
 
     def handleFilterChange(self):
         # This calls filterAcceptsRow:
         self.invalidateFilter()
+        self.filterUpdateFinished.emit()
 
     def registerFilter(self, filterObject):
         if not hasattr(filterObject, "getFilterData"):

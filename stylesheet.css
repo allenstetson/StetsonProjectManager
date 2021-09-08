@@ -6,14 +6,50 @@ QWidget {
     color: #021124;
 }
 
-SHPMTopBar,
 SHPMProjectBrowserFilter,
 SHPMProjectBrowserFilter QWidget{
     background-color: #e6f0f8;
 }
 
+SHPMTopBar QLineEdit {
+    background: #FFFFFF;
+    background-image: url("icons/search.png");
+    background-repeat: no-repeat;
+    background-position: left;
+    padding: 2 2 2 20;
+    border: 1px solid #d1dceb;
+    border-radius: 3px;
+}
+
+SHPMTopBar QPushButton {
+    color: #FFFFFF;
+    background: #0f4a7a;
+    font-size: 12px;
+    font-weight: 400;
+    padding: 6 8 6 27;
+    border: 1px solid;
+    border-color: #d1dceb;
+    border-radius: 3px;
+    background-image: url("icons/plus_white.png");
+    background-repeat: no-repeat;
+    background-position: left;
+    margin: 0 0 0 20;
+}
+SHPMTopBar QPushButton:hover {
+    background-color: #2874b2;
+    border-color: #2874b2;
+}
+SHPMTopBar QPushButton:pressed {
+    background-color: #143b5a;
+    border-color: #143b5a;
+}
+
 QLabel#textLight {
     color: #a5aebb;
+}
+QLabel#textBold {
+    color: #a5aebb;
+    font-weight: bold;
 }
 
 ClickableLabel {
@@ -33,6 +69,15 @@ ComboBoxCompleter {
     background-color: #FFFFFF;
 }
 
+QComboBox::drop-down {
+    border: 0px;
+}
+QComboBox::down-arrow {
+    image: url('./icons/down-arrow-18x12.png');
+    width: 15px;
+    height: 12px;
+    margin: 3px 3px 0px 3px;
+}
 
 QListView,
 ComboBoxCompleter {
