@@ -67,7 +67,7 @@ class StetsonProj(collections.OrderedDict):
         self['DATE_MODIFIED'] = datetime.datetime.now().strftime("%Y.%m.%d_%H:%M:%S")
         self['DESCRIPTION'] = ""
         self['DIRECTORY_NAS'] = ""
-        self['DIRECTORIES_LOCAL'] = ""
+        self['DIRECTORY_LOCAL'] = ""
         self['DISK_USAGE'] = None
         self['FILE_TYPES'] = []
         self['GIT_ENABLED'] = False
@@ -79,14 +79,15 @@ class StetsonProj(collections.OrderedDict):
         self['LAST_SYNC_HOST'] = ""
         self['LINKS'] = {}
         self['NOTES'] = {}
+        self['NUM_FILES'] = 0
         self['OWNER'] = None
         self['PROJECT_CATEGORY'] = None
         self['PROJECT_NAME'] = None
         self['PROJECT_STATUS'] = None
         self['PROJECT_TYPE'] = None
         self['TAGS'] = []
-        self['THUMBNAIL'] = None
-        self['USER_CONTRIBUTORS'] = None
+        self['THUMBNAIL_PATH'] = None
+        self['USER_CONTRIBUTORS'] = []
         self['USER_CREATED'] = os.environ['USERNAME']
         self['USER_MODIFIED'] = None
         self['WORKPLACE'] = None

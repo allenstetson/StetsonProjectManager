@@ -162,15 +162,15 @@ def getTitleFromProject(project):
 
 
 def getThumbnailFromProject(project):
-    if not "THUMBNAIL" in project:
+    if not "THUMBNAIL_PATH" in project:
         return None
     if USING_SAMPLE_DATA:
         thumbPath = project["THUMBNAIL_PATH"]
-        if not os.path.exists(thumbPath):
+        if not thumbPath or not os.path.exists(thumbPath):
             thumbPath = "icons/project_unknown.png"
         pixmap = QtGui.QPixmap(thumbPath)
     else:
-        pixmap = project["THUMBNAIL"]
+        pixmap = project["THUMBNAIL_PATH"]
     pixmap = pixmap.scaledToHeight(80)
     return pixmap
 

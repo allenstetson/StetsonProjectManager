@@ -660,6 +660,103 @@ class FilterUser(QtWidgets.QFrame):
         return sorted(users)
 
 
+class NewProjectWindow(QtWidgets.QFrame):
+    def __init__(self, parent=None):
+        super(NewProjectWindow, self).__init__(parent=parent)
+        self.layout = QtWidgets.QVBoxLayout(self)
+        self.parent = parent
+        self._buildLayout()
+        self.setMaximumHeight(800)
+        self.setMaximumWidth(400)
+        self.setObjectName("NewProjectWindow")
+
+    def _buildLayout(self):
+        # Title / Descr
+        titleText = QtWidgets.QLabel("Create Project...")
+        titleText.setObjectName("popupTitle")
+        self.layout.addWidget(titleText)
+        msg = "Please tell us about your new project."
+        descrText = QtWidgets.QLabel(msg)
+        descrText.setObjectName("standardText")
+        self.layout.addWidget(descrText)
+
+        # Action Buttons
+        layoutActionButtons = QtWidgets.QHBoxLayout()
+        spacerL = QtWidgets.QSpacerItem(
+            40,
+            1,
+            QtWidgets.QSizePolicy.Expanding)
+        layoutActionButtons.addItem(spacerL)
+
+        self.btnCancel = QtWidgets.QPushButton("Cancel")
+        self.btnCancel.setObjectName("secondaryButton")
+        self.btnCancel.clicked.connect(self.parent.closePopupWindow)
+        layoutActionButtons.addWidget(self.btnCancel)
+
+        self.btnCreateProject = QtWidgets.QPushButton("Create Project")
+        self.btnCreateProject.setObjectName("primaryButton")
+        self.btnCreateProject.clicked.connect(self.createNewProject)
+        layoutActionButtons.addWidget(self.btnCreateProject)
+        self.layout.addLayout(layoutActionButtons)
+
+    def createNewProject(self):
+        self.parent.closePopupWindow()
+
+
+class PopupWindow(QtWidgets.QFrame):
+    closePopup = QtCore.pyqtSignal()
+    def __init__(self, parent=None):
+        super(PopupWindow, self).__init__(parent)
+
+        self.layout = QtWidgets.QHBoxLayout()
+        # make the window frameless
+        self.setWindowFlags(QtCore.Qt.FramelessWindowHint)
+        self.setAttribute(QtCore.Qt.WA_TranslucentBackground)
+        
+        # left space
+        spacerL = QtWidgets.QSpacerItem(
+            40,
+            10,
+            QtWidgets.QSizePolicy.Expanding)
+        self.layout.addItem(spacerL)
+        # widget
+        self.makeCenterWidget()
+        # right space
+        spacerR = QtWidgets.QSpacerItem(
+            40,
+            10,
+            QtWidgets.QSizePolicy.Expanding)
+        self.layout.addItem(spacerR)
+        self.setLayout(self.layout)
+
+    def closePopupWindow(self):
+        self.closePopup.emit()
+
+    def makeCenterWidget(self):
+        raise NotImplementedError
+
+    def paintEvent(self, event):
+        fillColor = QtGui.QColor(19, 42, 66, 217)
+        penColor = QtGui.QColor("#333333")
+
+        # get current window size
+        s = self.size()
+        qp = QtGui.QPainter()
+        qp.begin(self)
+        qp.setRenderHint(QtGui.QPainter.Antialiasing, True)
+        qp.setPen(penColor)
+        qp.setBrush(fillColor)
+        qp.drawRect(0, 0, s.width(), s.height())
+
+        qp.end()
+
+
+class PopupNewProject(PopupWindow):
+    def makeCenterWidget(self):
+        centerWidget = NewProjectWindow(self)
+        self.layout.addWidget(centerWidget)
+
+
 class StetsonHPMMainWindow(QtWidgets.QMainWindow):
     """Main window for Stetson HPM, containing the main widget.
 
@@ -674,6 +771,24 @@ class StetsonHPMMainWindow(QtWidgets.QMainWindow):
         self.setMinimumSize(QtCore.QSize(500, 350))
         self.resize(QtCore.QSize(1020, 768))
         self.setCentralWidget(StetsonHPMMainWidget(self))
+        self.popupWindows = []
+
+    def closePopup(self, popup):
+        popup.close()
+        self.popupWindows.remove(popup)
+
+    def resizeEvent(self, event):
+        for popup in self.popupWindows:
+            popup.move(0, 0)
+            popup.resize(self.width(), self.height())
+
+    def showPopup(self, cls):
+        popup = cls(self)
+        popup.move(0, 0)
+        popup.show()
+        popup.resize(self.width(), self.height())
+        popup.closePopup.connect(lambda: self.closePopup(popup))
+        self.popupWindows.append(popup)
 
 
 @styledQt
@@ -711,20 +826,25 @@ class SearchBox(QtWidgets.QLineEdit):
 
 
 class SHPMTopBar(QtWidgets.QFrame):
+    filterTriggered = QtCore.pyqtSignal(str)
     def __init__(self, parent=None):
         super(SHPMTopBar, self).__init__(parent=parent)
         self.layout = QtWidgets.QHBoxLayout()
+        self.typingTimer = QtCore.QTimer()
+        self.typingTimer.setSingleShot(True)
+        self.typingTimer.timeout.connect(self.triggerFilter)
+
         # search
-        searchBox = SearchBox(parent=self)
-        searchBox.setMinimumWidth(150)
-        searchBox.setMaximumWidth(150)
-        self.layout.addWidget(searchBox)
+        self.searchBox = SearchBox(parent=self)
+        self.searchBox.setMinimumWidth(150)
+        self.searchBox.setMaximumWidth(150)
+        self.searchBox.textChanged.connect(self.startTypingTimer)
+        self.layout.addWidget(self.searchBox)
         #space
         spacer = QtWidgets.QSpacerItem(
             400,
             10,
-            QtWidgets.QSizePolicy.Expanding
-            )
+            QtWidgets.QSizePolicy.Expanding)
         self.layout.addItem(spacer)
         # user
         self.profilePicture = QtWidgets.QLabel()
@@ -737,9 +857,22 @@ class SHPMTopBar(QtWidgets.QFrame):
         # button
         self.btnNewProject = QtWidgets.QPushButton(self)
         self.btnNewProject.setText("New Project")
+        self.btnNewProject.clicked.connect(self._handleNewProject)
         self.layout.addWidget(self.btnNewProject)
 
         self.setLayout(self.layout)
+
+    def _handleNewProject(self):
+        for widget in QtWidgets.QApplication.topLevelWidgets():
+            if "StetsonHPMMainWindow" in str(widget.__class__):
+                widget.showPopup(PopupNewProject)
+                return
+
+    def startTypingTimer(self):
+        self.typingTimer.start(900)
+
+    def triggerFilter(self):
+        self.filterTriggered.emit(self.searchBox.text())
 
 
 class SHPMWindowStack(QtWidgets.QStackedWidget):
@@ -818,6 +951,7 @@ class SHPMProjectBrowser(QtWidgets.QFrame):
         self.layout.addWidget(self.browserSplitter)
         # Connect filter to list
         self.projectFilter.dirtyFilter.connect(self.projectList.filterList)
+        self.topBar.filterTriggered.connect(self.projectList.filterList)   
         self.setLayout(self.layout)
         self.updateNumResults()
 
@@ -1368,6 +1502,7 @@ class SHPMProjectBrowserList(QtWidgets.QFrame):
     filterUpdateFinished = QtCore.pyqtSignal()
     def  __init__(self, parent=None):
         super(SHPMProjectBrowserList, self).__init__(parent=parent)
+        self._filterText = None
         self.layout = QtWidgets.QHBoxLayout()
         allProjects = controller.getAllProjects()
         self.listModel = SHPMProjectBrowserListProxyModel(allProjects, self)
@@ -1386,8 +1521,10 @@ class SHPMProjectBrowserList(QtWidgets.QFrame):
     def _handleFilterFinished(self):
         self.filterUpdateFinished.emit()
 
-    def filterList(self):
-        self.listModel.handleFilterChange()
+    def filterList(self, inText=None):
+        if not inText is None:
+            self._filterText = inText
+        self.listModel.handleFilterChange(self._filterText)
 
     def registerFilter(self, filterObject):
         self.listModel.registerFilter(filterObject)
@@ -1412,12 +1549,19 @@ class SHPMProjectBrowserListProxyModel(QtCore.QSortFilterProxyModel):
     filterUpdateFinished = QtCore.pyqtSignal()
     def  __init__(self, listData, parent=None):
         super(SHPMProjectBrowserListProxyModel, self).__init__(parent=parent)
+        self._filterText = None
         self._registeredFilters = []
         self.setSourceModel(SHPMProjectBrowserListModel(listData))
 
     def filterAcceptsRow(self, sourceRow, sourceParent):
         idx = self.sourceModel().index(sourceRow, 0, sourceParent).row()
         itemData = self.sourceModel().listData[idx]
+        # String filter
+        if self._filterText:
+            pTitle = controller.getTitleFromProject(itemData)
+            if not self._filterText.lower() in pTitle.lower():
+                return False
+        # Tag filters
         for filterObject in self._registeredFilters:
             species, filterData = filterObject.getFilterData()
             # TAGS
@@ -1446,8 +1590,10 @@ class SHPMProjectBrowserListProxyModel(QtCore.QSortFilterProxyModel):
                     return False
         return True
 
-    def handleFilterChange(self):
+    def handleFilterChange(self, inText=None):
         # This calls filterAcceptsRow:
+        if not inText is None:
+            self._filterText = inText
         self.invalidateFilter()
         self.filterUpdateFinished.emit()
 

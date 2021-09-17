@@ -1,5 +1,13 @@
 
+import os
+import multiprocessing
+import pathlib
+import time
+
 import database
+
+
+NUM_PROCS = multiprocessing.cpu_count()
 
 
 def getAllProjectsForPath(diskPath):
@@ -80,4 +88,116 @@ def getAllProjectsForPath(diskPath):
     tempProject['USER_MODIFIED'] = "allen"
     tempProjects.append(tempProject)
 
-    return tempProjects * 6
+    tempProjects.extend(checkDirectoryForUpdates("Y:\\school"))
+    tempProjects.extend(checkDirectoryForUpdates("Y:\\home"))
+    tempProjects.extend(checkDirectoryForUpdates("Y:\\church"))
+    tempProjects.extend(checkDirectoryForUpdates("Y:\\web"))
+
+    return tempProjects
+
+def checkDirectoryForUpdates(dirPath):
+    if not os.path.isdir(dirPath):
+        msg = "Directory expected. Not a directory: {}".format(dirPath)
+        raise ValueError(msg)
+    # Get all project roots from all categories
+    dirPath = pathlib.Path(dirPath)
+    projectRoots = [x for x in dirPath.iterdir() if x.is_dir()]
+    projectRootQueue = multiprocessing.Queue()
+    for pRoot in projectRoots:
+        print("root: {}".format(pRoot))
+        projectRootQueue.put(pRoot)
+    projectQueue = multiprocessing.Manager().list()
+    procs = [
+        multiprocessing.Process(
+            target=projectPathProcessor,
+            args=(projectRootQueue, projectQueue)
+        ) for x in range(NUM_PROCS)
+    ]
+    for proc in procs:
+        proc.start()
+    for proc in procs:
+        proc.join()
+
+    return list(projectQueue)
+
+
+def projectPathProcessor(projectRootQueue, projectQueue):
+    while not projectRootQueue.empty():
+        projectRoot = projectRootQueue.get()
+        worker = ProjectPathWorker(projectRoot)
+        project = worker.run()
+        if project:
+            projectQueue.append(project)
+
+
+class ProjectPathWorker(object):
+    def __init__(self, projPath):
+        self.category = None
+        self.contributors = set()
+        self.fileTypes = set()
+        self.numFiles = 0
+        self.owner = None
+        self.path = projPath
+
+    def run(self):
+        # TODO: Check for a .stetsonproj file with ID
+        #  If exists, get the project from the DB and update the properties
+        #  If not, then create a new project:
+        project = database.StetsonProj()
+        project['PROJECT_CATEGORY'] = os.path.split(
+            os.path.dirname(self.path))[-1].lower()
+        project['DIRECTORY_NAS'] = self.path
+        project['PROJECT_NAME'] = os.path.split(self.path)[-1]
+
+        ctime = os.path.getctime(self.path)
+        lastMod = None
+        modTime = None
+        numFiles = 0
+        thumbnail = None
+        totalSize = 0
+        for dirName, dirs, files in os.walk(self.path):
+            if ".git" in dirs:
+                project['INTEGRATIONS'].append("git")
+                project['GIT_ENABLED'] = True
+                project['GIT_ROOT'] = dirName
+                dirs.remove(".git")
+            if ".ask" in dirs:
+                project['INTEGRATIONS'].append("alexa")
+            # don't include private dirs
+            dirs = [x for x in dirs if not x.startswith(".")]
+            for fileName in files:
+                numFiles += 1
+                filePath = os.path.join(dirName, fileName)
+                # extensions
+                fExt = os.path.splitext(fileName)[1]
+                if fExt:
+                    self.fileTypes.add(fExt.lower())
+                # size
+                totalSize += os.stat(filePath).st_size
+                # lastMod
+                modTime = os.path.getmtime(filePath)
+                if not lastMod or modTime < lastMod:
+                    lastMod = modTime
+                # ctime
+                #  Sometimes the main directory is recreated (after a
+                #  catastrophy, etc) and the ctime on that dir is not
+                #  representative of reality. In that case, just use the
+                #  lowest mod time
+                if modTime < ctime:
+                    ctime = modTime
+                # thumbnail
+                if not thumbnail and fExt.lower() in [".jpg", ".png", ".jpeg"]:
+                    thumbnail = filePath
+                    #TODO: Create a circular TN and store in the DB
+
+        project['DATE_CREATED'] = time.ctime(ctime)
+        if modTime:
+            project["DATE_MODIFIED"] = time.ctime(modTime)
+        project["FILE_TYPES"] = list(self.fileTypes)
+        project["DISK_USAGE"] = totalSize
+        project['NUM_FILES'] = numFiles
+        if thumbnail:
+            project['THUMBNAIL_PATH'] = thumbnail
+        #TODO: Store in the DB
+        return project
+

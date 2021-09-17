@@ -11,6 +11,11 @@ SHPMProjectBrowserFilter QWidget{
     background-color: #e6f0f8;
 }
 
+NewProjectWindow {
+    background-color: #FFFFFF;
+    font-size: 30px;
+}
+
 SHPMTopBar QLineEdit {
     background: #FFFFFF;
     background-image: url("icons/search.png");
