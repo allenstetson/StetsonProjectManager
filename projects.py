@@ -89,9 +89,9 @@ def getAllProjectsForPath(diskPath):
     tempProjects.append(tempProject)
 
     tempProjects.extend(checkDirectoryForUpdates("Y:\\school"))
-    tempProjects.extend(checkDirectoryForUpdates("Y:\\home"))
-    tempProjects.extend(checkDirectoryForUpdates("Y:\\church"))
-    tempProjects.extend(checkDirectoryForUpdates("Y:\\web"))
+    #tempProjects.extend(checkDirectoryForUpdates("Y:\\home"))
+    #tempProjects.extend(checkDirectoryForUpdates("Y:\\church"))
+    #tempProjects.extend(checkDirectoryForUpdates("Y:\\web"))
 
     return tempProjects
 

@@ -6,14 +6,54 @@ QWidget {
     color: #021124;
 }
 
+/* OVERLAY WINDOW */
+#overlayTitle {
+    font-size: 20px;
+}
+
+#primaryButton {
+    color: #FFFFFF;
+    background: #0f4a7a;
+    font-size: 11px;
+    font-weight: 400;
+    padding: 6 8 6 8;
+    border: 1px solid;
+    border-color: #d1dceb;
+    border-radius: 3px;
+    background-repeat: no-repeat;
+    background-position: left;
+    margin: 0 0 0 0;
+}
+
+#secondaryButton {
+    color: #0f4a7a;
+    background: #FFFFFF;
+    font-size: 11px;
+    font-weight: 400;
+    padding: 6 8 6 8;
+    border: 1px solid;
+    border-color: #0f4a7a;
+    border-radius: 3px;
+    background-repeat: no-repeat;
+    background-position: left;
+    margin: 0 0 0 0;
+}
+
+#overlayFieldName {
+    font-weight: 600;
+    font-size: 11px;
+    margin: 0 0 0 10;
+}
+#overlayLineEdit {
+    border: 1px solid;
+    border-color: #a5aebb;
+    border-radius: 3px;
+}
+
+/* PROJECT BROWSER */
 SHPMProjectBrowserFilter,
 SHPMProjectBrowserFilter QWidget{
     background-color: #e6f0f8;
-}
-
-NewProjectWindow {
-    background-color: #FFFFFF;
-    font-size: 30px;
 }
 
 SHPMTopBar QLineEdit {

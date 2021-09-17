@@ -295,6 +295,7 @@ class TimePicker(QtWidgets.QFrame):
         self.layout.addItem(endSpacer)
         self.setLayout(self.layout)
 
+
 class DatePopup(QtWidgets.QDateTimeEdit):
     def __init__(self, before=True, *args, **kwargs):
         super(DatePopup, self).__init__(*args, **kwargs, calendarPopup=True)
@@ -660,25 +661,111 @@ class FilterUser(QtWidgets.QFrame):
         return sorted(users)
 
 
+@styledQt
 class NewProjectWindow(QtWidgets.QFrame):
     def __init__(self, parent=None):
         super(NewProjectWindow, self).__init__(parent=parent)
         self.layout = QtWidgets.QVBoxLayout(self)
         self.parent = parent
         self._buildLayout()
-        self.setMaximumHeight(800)
-        self.setMaximumWidth(400)
-        self.setObjectName("NewProjectWindow")
 
     def _buildLayout(self):
         # Title / Descr
         titleText = QtWidgets.QLabel("Create Project...")
-        titleText.setObjectName("popupTitle")
+        titleText.setObjectName("overlayTitle")
         self.layout.addWidget(titleText)
         msg = "Please tell us about your new project."
         descrText = QtWidgets.QLabel(msg)
         descrText.setObjectName("standardText")
         self.layout.addWidget(descrText)
+
+        # Fields
+        ## NAME/CAT
+        nameCatTitleLayout = QtWidgets.QHBoxLayout()
+        lblProjName = QtWidgets.QLabel("PROJECT NAME")
+        lblProjName.setObjectName("overlayFieldName")
+        nameCatTitleLayout.addWidget(lblProjName)
+        lblCategory = QtWidgets.QLabel("CATEGORY")
+        lblCategory.setObjectName("overlayFieldName")
+        nameCatTitleLayout.addWidget(lblCategory)
+        self.layout.addLayout(nameCatTitleLayout)
+        ##
+        nameCatLayout = QtWidgets.QHBoxLayout()
+        self.projectName = QtWidgets.QLineEdit()
+        self.projectName.setObjectName("overlayLineEdit")
+        self.projectName.setPlaceholderText("Add project name")
+        nameCatLayout.addWidget(self.projectName)
+        self.category = QtWidgets.QLineEdit()
+        self.category.setObjectName("overlayLineEdit")
+        self.category.setPlaceholderText("Select a category")
+        nameCatLayout.addWidget(self.category)
+        self.layout.addLayout(nameCatLayout)
+
+        ## DESCR
+        lblDescription = QtWidgets.QLabel("DESCRIPTION")
+        lblDescription.setObjectName("overlayFieldName")
+        self.layout.addWidget(lblDescription)
+        ##
+        self.description = QtWidgets.QTextEdit()
+        self.description.setObjectName("overlayLineEdit")
+        self.description.setPlaceholderText("Add additional information about project")
+        self.layout.addWidget(self.description)
+
+        ## CLIENT/CONTACTS
+        clientConTitleLayout = QtWidgets.QHBoxLayout()
+        lblClient = QtWidgets.QLabel("CLIENT")
+        lblClient.setObjectName("overlayFieldName")
+        clientConTitleLayout.addWidget(lblClient)
+        lblContacts = QtWidgets.QLabel("CONTACTS")
+        lblContacts.setObjectName("overlayFieldName")
+        clientConTitleLayout.addWidget(lblContacts)
+        self.layout.addLayout(clientConTitleLayout)
+        ##
+        clientConLayout = QtWidgets.QHBoxLayout()
+        self.client = QtWidgets.QLineEdit()
+        self.client.setObjectName("overlayLineEdit")
+        self.client.setPlaceholderText("Add client name")
+        clientConLayout.addWidget(self.client)
+        self.contacts = QtWidgets.QLineEdit()
+        self.contacts.setObjectName("overlayLineEdit")
+        self.contacts.setPlaceholderText("Add a contact")
+        clientConLayout.addWidget(self.contacts)
+        self.layout.addLayout(clientConLayout)
+        ##
+        clientConAddLayout = QtWidgets.QHBoxLayout()
+        self.addClient = ClickableLabel("\N{PLUS SIGN} Add another client")
+        clientConAddLayout.addWidget(self.addClient)
+        self.addContact = ClickableLabel("\N{PLUS SIGN} Add another contact")
+        clientConAddLayout.addWidget(self.addContact)
+        self.layout.addLayout(clientConAddLayout)
+
+        ## LINKS/INTEGRATIONS
+        linkIntegTitleLayout = QtWidgets.QHBoxLayout()
+        lblLinks = QtWidgets.QLabel("LINKS")
+        lblLinks.setObjectName("overlayFieldName")
+        linkIntegTitleLayout.addWidget(lblLinks)
+        lblInteg = QtWidgets.QLabel("INTEGRATIONS")
+        lblInteg.setObjectName("overlayFieldName")
+        linkIntegTitleLayout.addWidget(lblInteg)
+        self.layout.addLayout(linkIntegTitleLayout)
+        ##
+        linkIntegLayout = QtWidgets.QHBoxLayout()
+        self.links = QtWidgets.QLineEdit()
+        self.links.setObjectName("overlayLineEdit")
+        self.links.setPlaceholderText("Add a link")
+        linkIntegLayout.addWidget(self.links)
+        self.integrations = QtWidgets.QLineEdit()
+        self.integrations.setObjectName("overlayLineEdit")
+        self.integrations.setPlaceholderText("(Git, Alexa, YouTube, FB, etc.)")
+        linkIntegLayout.addWidget(self.contacts)
+        self.layout.addLayout(linkIntegLayout)
+        ##
+        linkIntegAddLayout = QtWidgets.QHBoxLayout()
+        self.addLink = ClickableLabel("\N{PLUS SIGN} Add another link")
+        linkIntegAddLayout.addWidget(self.addLink)
+        self.addIntegration = ClickableLabel("\N{PLUS SIGN} Add another integration")
+        linkIntegAddLayout.addWidget(self.addIntegration)
+        self.layout.addLayout(linkIntegAddLayout)
 
         # Action Buttons
         layoutActionButtons = QtWidgets.QHBoxLayout()
@@ -690,7 +777,7 @@ class NewProjectWindow(QtWidgets.QFrame):
 
         self.btnCancel = QtWidgets.QPushButton("Cancel")
         self.btnCancel.setObjectName("secondaryButton")
-        self.btnCancel.clicked.connect(self.parent.closePopupWindow)
+        self.btnCancel.clicked.connect(self.parent.closeOverlayWindow)
         layoutActionButtons.addWidget(self.btnCancel)
 
         self.btnCreateProject = QtWidgets.QPushButton("Create Project")
@@ -700,15 +787,18 @@ class NewProjectWindow(QtWidgets.QFrame):
         self.layout.addLayout(layoutActionButtons)
 
     def createNewProject(self):
-        self.parent.closePopupWindow()
+        self.parent.closeOverlayWindow()
 
 
-class PopupWindow(QtWidgets.QFrame):
-    closePopup = QtCore.pyqtSignal()
+class OverlayWindow(QtWidgets.QFrame):
+    closeOverlay = QtCore.pyqtSignal()
     def __init__(self, parent=None):
-        super(PopupWindow, self).__init__(parent)
-
+        super(OverlayWindow, self).__init__(parent)
+        self.centerWidget = None
+        self.centerWidgetWidth = 800
+        self.centerWidgetWidth = 600
         self.layout = QtWidgets.QHBoxLayout()
+
         # make the window frameless
         self.setWindowFlags(QtCore.Qt.FramelessWindowHint)
         self.setAttribute(QtCore.Qt.WA_TranslucentBackground)
@@ -719,8 +809,13 @@ class PopupWindow(QtWidgets.QFrame):
             10,
             QtWidgets.QSizePolicy.Expanding)
         self.layout.addItem(spacerL)
+
         # widget
         self.makeCenterWidget()
+        self.centerWidget.setFixedWidth(self.centerWidgetWidth)
+        self.centerWidget.setFixedHeight(self.centerWidgetHeight)
+        self.layout.addWidget(self.centerWidget)
+
         # right space
         spacerR = QtWidgets.QSpacerItem(
             40,
@@ -729,32 +824,46 @@ class PopupWindow(QtWidgets.QFrame):
         self.layout.addItem(spacerR)
         self.setLayout(self.layout)
 
-    def closePopupWindow(self):
-        self.closePopup.emit()
+    def closeOverlayWindow(self):
+        self.closeOverlay.emit()
 
     def makeCenterWidget(self):
         raise NotImplementedError
 
     def paintEvent(self, event):
+        # Transparent background
         fillColor = QtGui.QColor(19, 42, 66, 217)
         penColor = QtGui.QColor("#333333")
-
-        # get current window size
-        s = self.size()
         qp = QtGui.QPainter()
         qp.begin(self)
         qp.setRenderHint(QtGui.QPainter.Antialiasing, True)
         qp.setPen(penColor)
         qp.setBrush(fillColor)
-        qp.drawRect(0, 0, s.width(), s.height())
+        qp.drawRect(0, 0, self.size().width(), self.size().height())
+
+        # White window background
+        fillColor = QtGui.QColor(255, 255, 255, 255)
+        penColor = QtGui.QColor("#FFFFFF")
+        qp = QtGui.QPainter()
+        qp.begin(self)
+        qp.setRenderHint(QtGui.QPainter.Antialiasing, True)
+        qp.setPen(penColor)
+        qp.setBrush(fillColor)
+        widgetPadding = 15
+        desiredWidth = self.centerWidgetWidth + (widgetPadding * 2)
+        desiredHeight = self.centerWidgetHeight + (widgetPadding * 2)
+        wOffset = (self.size().width() - desiredWidth) / 2
+        hOffset = (self.size().height() - desiredHeight) / 2
+        qp.drawRect(wOffset, hOffset, desiredWidth, desiredHeight)
 
         qp.end()
 
 
-class PopupNewProject(PopupWindow):
+class OverlayWindowNewProject(OverlayWindow):
     def makeCenterWidget(self):
-        centerWidget = NewProjectWindow(self)
-        self.layout.addWidget(centerWidget)
+        self.centerWidgetWidth = 500
+        self.centerWidgetHeight = 600
+        self.centerWidget = NewProjectWindow(self)
 
 
 class StetsonHPMMainWindow(QtWidgets.QMainWindow):
@@ -771,24 +880,24 @@ class StetsonHPMMainWindow(QtWidgets.QMainWindow):
         self.setMinimumSize(QtCore.QSize(500, 350))
         self.resize(QtCore.QSize(1020, 768))
         self.setCentralWidget(StetsonHPMMainWidget(self))
-        self.popupWindows = []
+        self.overlayWindows = []
 
-    def closePopup(self, popup):
-        popup.close()
-        self.popupWindows.remove(popup)
+    def closeOverlay(self, overlayWin):
+        overlayWin.close()
+        self.overlayWindows.remove(overlayWin)
 
     def resizeEvent(self, event):
-        for popup in self.popupWindows:
-            popup.move(0, 0)
-            popup.resize(self.width(), self.height())
+        for overlayWin in self.overlayWindows:
+            overlayWin.move(0, 0)
+            overlayWin.resize(self.width(), self.height())
 
-    def showPopup(self, cls):
-        popup = cls(self)
-        popup.move(0, 0)
-        popup.show()
-        popup.resize(self.width(), self.height())
-        popup.closePopup.connect(lambda: self.closePopup(popup))
-        self.popupWindows.append(popup)
+    def showOverlayWindow(self, cls):
+        overlayWin = cls(self)
+        overlayWin.move(0, 0)
+        overlayWin.show()
+        overlayWin.resize(self.width(), self.height())
+        overlayWin.closeOverlay.connect(lambda: self.closeOverlay(overlayWin))
+        self.overlayWindows.append(overlayWin)
 
 
 @styledQt
@@ -865,7 +974,7 @@ class SHPMTopBar(QtWidgets.QFrame):
     def _handleNewProject(self):
         for widget in QtWidgets.QApplication.topLevelWidgets():
             if "StetsonHPMMainWindow" in str(widget.__class__):
-                widget.showPopup(PopupNewProject)
+                widget.showOverlayWindow(OverlayWindowNewProject)
                 return
 
     def startTypingTimer(self):
