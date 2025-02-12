@@ -6,7 +6,7 @@ WORKDIR /app
 
 # Clone your GitHub repository
 RUN apt update && apt install -y git && \
-    git clone https://github.com/YOUR_USERNAME/YOUR_REPO.git /app
+    git clone https://github.com/allenstetson/StetsonProjectManager.git /app
 
 # Install Python dependencies if needed
 RUN apt install -y python3 python3-pip && \
